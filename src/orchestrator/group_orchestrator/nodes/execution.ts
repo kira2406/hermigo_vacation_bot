@@ -1,7 +1,6 @@
 
-import { sendReaction, type Reaction } from "../../../linq/client.js";
+import { sendReaction, type Reaction, sendMessage } from "../../../linq/client.js";
 import { storeBotMessage, storeReaction } from "../../../services/conversation.service.js";
-import { sendMessageToChat } from "../../../services/linq.service.js";
 import type { VacationGraphState } from "../state.js";
 
 /**
@@ -40,7 +39,7 @@ export async function executionNode(state: VacationGraphState): Promise<Partial<
     const parts = content.split("---").map((p) => cleanResponse(p.trim())).filter(Boolean);
 
     for (const part of parts) {
-    await sendMessageToChat(state.chatId, part); // ✅ await each one before sending next
+    await sendMessage(state.chatId, part); // ✅ await each one before sending next
     await delay(1500); // ✅ pause between messages like a human would
   }
     await storeBotMessage({ chatId: state.chatId, content });

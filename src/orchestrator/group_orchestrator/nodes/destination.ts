@@ -1,11 +1,6 @@
 import { destinationAgent } from "../../../agents/destination.agent.js";
-import { updateDestination, updateVacationState } from "../../../services/conversation.service.js";
 import type { VacationGraphState } from "../state.js";
 
-/**
- * Node: Destination Specialist
- * Triggered when the Orchestrator detects conflict or consensus.
- */
 export async function destinationNode(
   state: VacationGraphState
 ): Promise<Partial<VacationGraphState>> {
@@ -13,40 +8,31 @@ export async function destinationNode(
     .map((msg) => `[${msg.timestamp || "unknown"}] ${msg.sender}: ${msg.content}`)
     .join("\n");
 
-  const mode = state.decision?.isConflict ? "conflict" : "consensus";
-
-  console.log(`[Destination Agent] triggered in [${mode}] mode`);
+  console.log("🗺️ Destination Node triggered");
 
   try {
-    const content = await destinationAgent(formattedHistory, mode);
-
-    const nextVacationState = state.decision?.isConsensus ? "itinerary" : state.vacationState;
-
-    if (state.decision?.isConsensus) {
-      await updateVacationState(state.chatId, "itinerary");
-
-      if (state.decision.confirmedDestination) {
-        await updateDestination(state.chatId, state.decision.confirmedDestination);
-      }
-      console.log(`[Destination Agent] consensus reached, moving to next state: ${nextVacationState}`);
-    }
-
-
-    console.log("[Destination Agent] result:", content);
+    const { action, content, confirmedDestination, advanceState } = await destinationAgent(
+      state.chatId,
+      formattedHistory,
+      state.participantCount
+    );
 
     return {
+      vacationState: advanceState ? "itinerary" : state.vacationState,
       decision: {
-        action: "reply",
+        action, // ✅ now passes ignore/react/reply through correctly
         content,
-        reasoning: `Resolved via Destination Agent (${mode} mode)`,
+        reasoning: advanceState
+          ? `Consensus reached — destination locked as ${confirmedDestination}`
+          : "Destination agent handled the conversation",
       },
     };
   } catch (error) {
-    console.error("❌ Destination Agent failed:", error);
+    console.error("❌ Destination Node failed:", error);
     return {
       decision: {
         action: "reply",
-        content: "Sorry, I ran into an issue finding destination options. Let me try again shortly.",
+        content: "Sorry, I ran into an issue. Let me try again shortly.",
         reasoning: "Destination Agent threw an error",
       },
     };
