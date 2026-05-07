@@ -14,9 +14,9 @@ export interface Decision {
   content?: string | BuiltInReaction; // The message text to send, or the emoji to react with
   reasoning: string;
   targetAgent?: "destination" | "itinerary" | "accommodation";
-  isConflict?: boolean;
-  isConsensus?: boolean;
-  confirmedDestination?: string;
+  // isConflict?: boolean;
+  // isConsensus?: boolean;
+  // confirmedDestination?: string;
 }
 
 // Single source of truth — annotation lives here

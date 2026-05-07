@@ -19,29 +19,15 @@ export async function orchestratorNode(state: VacationGraphState): Promise<Parti
     ROUTING RULES:
     1. "ignore": Let humans converse. Wait for consensus (at least ${Math.ceil(state.participantCount / 2)} people).
     2. "react": Lightweight agreement or validation. Select "love", "like", "dislike", "laugh" ,"emphasize", "question" or a custom emoji to react to the message.
-    3. "reply": Direct answers or summarizing consensus.
-    4. "delegate": Deep-dive tasks for specialists.
+    3. "reply": You can directly answer a simple question or summarize something.
+    4. "delegate": The message requires a specialist agent to handle.
 
-    SPECIAL DELEGATION (for "destination" stage):
-    You MUST delegate to the "destination" agent in these two scenarios:
-
-    SCENARIO A — CONFLICT:
-    - Users are debating between multiple locations and cannot agree.
-    - Set "isConflict": true, "isConsensus": false.
-    - The destination agent will search for activities and attractions in each contested location
-      and recommend which place best suits the group's combined interests.
-
-    SCENARIO B — CONSENSUS:
-    - The group has agreed on a destination.
-    - Set "isConsensus": true, "isConflict": false.
-    - The destination agent will search for the best activities, landmarks, and attractions
-      at the agreed location to help the group plan what to do there.
-    - When isConsensus is true, extract the agreed city name from the conversation 
-    and populate "confirmedDestination" with just the city name (e.g. "Shanghai").
-
-    DO NOT "reply" when a delegation scenario is met. Always "delegate" so the specialist
-    can provide real, researched suggestions instead of a generic answer.
-
+    WHEN TO DELEGATE:
+    - vacationState is "destination" and the group is discussing, debating, or agreeing on a location → delegate to "destination"
+    - vacationState is "itinerary" and the group is discussing activities or schedule → delegate to "itinerary"
+    - vacationState is "accommodation" and the group is discussing hotels or stays → delegate to "accommodation"
+    Always choose "delegate" in these scenarios to allow the specialist agents to provide researched, specific suggestions instead of generic replies.
+    
     CRITICAL: 
     If you choose "reply", mirror how humans actually text:
     - Use "---" to split your response into separate messages sent individually
@@ -55,10 +41,7 @@ export async function orchestratorNode(state: VacationGraphState): Promise<Parti
       "targetAgent": "destination" | "itinerary" | "accommodation", // Only if action is "delegate". iF "reply" OR "react", leave blank.
       "reasoning": "Briefly explain why you chose this action based on the rules.",
       "content": "If action is 'reply', the message to send. If 'react', the emoji. If 'ignore', leave blank.",
-      "isConflict": boolean,
-      "isConsensus": boolean,
-      "confirmedDestination": "City Name" // Only if you detect a clear destination mentioned by users, otherwise leave blank. This helps the destination agent in both conflict and consensus scenarios.
-    }
+      }
   `;
 
   const userContext = `HISTORY:\n${formattedHistory}\n\nCURRENT MESSAGE: ${state.sender}: ${state.text}`;

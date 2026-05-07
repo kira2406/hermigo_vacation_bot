@@ -1,20 +1,20 @@
-import LinqAPIV3 from "@linqapp/sdk";
+// import LinqAPIV3 from "@linqapp/sdk";
 
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
 
-dotenv.config();
+// dotenv.config();
 
-if (!process.env.LINQ_API_TOKEN) {
+// if (!process.env.LINQ_API_TOKEN) {
 
-  throw new Error("LINQ_API_TOKEN is missing");
+//   throw new Error("LINQ_API_TOKEN is missing");
 
-}
+// }
 
 
 
-export const client = new LinqAPIV3({
+// export const client = new LinqAPIV3({
 
-  apiKey: process.env.LINQ_API_TOKEN,
+//   apiKey: process.env.LINQ_API_TOKEN,
 
-});
+// });
 
