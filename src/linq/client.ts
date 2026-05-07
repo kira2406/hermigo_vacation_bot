@@ -31,6 +31,76 @@ export interface ChatInfo {
   service: string;
 }
 
+export interface CreateGroupChatResponse {
+  chat:{
+    id: string;
+  }
+  id: string;
+  display_name: string | null;
+  handles: ChatHandle[];
+  is_group: boolean;
+  service: string;
+}
+
+export async function createGroupChat(
+  display_name: string,
+  sender: string,
+  participants: string[]
+): Promise<CreateGroupChatResponse> {
+  if (!API_TOKEN) {
+    throw new Error("LINQ_API_TOKEN not configured");
+  }
+
+  if (!participants || participants.length === 0) {
+    throw new Error("Participants list is empty");
+  }
+
+  const phoneNumber = process.env.LINQ_PHONE_NUMBER;
+  if (!phoneNumber) {
+    throw new Error("LINQ_PHONE_NUMBER not configured");
+  }
+
+  const url = `${BASE_URL}/chats`;
+
+  console.log(`[linq] Creating group chat for sender: ${sender} with ${participants.length} participants`);
+
+  const text = `Welcome to the group --- Hey everyone 👋 ${sender} started a trip planning chat ✈️`;
+
+  const body = {
+    display_name: display_name,
+    from: phoneNumber,
+    to: participants,
+    message: {
+      parts: [
+        {
+          type: "text",
+          value: text,
+        },
+      ],
+    },
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[linq] API error ${response.status}: ${truncateError(errorText)}`);
+    throw new Error(`Linq API error: ${response.status} ${truncateError(errorText)}`);
+  }
+
+  const data = await response.json() as CreateGroupChatResponse;
+  console.log(`[linq] Group chat created: ${data.chat.id}`);
+
+  return data;
+}
+
 export async function getChat(chatId: string): Promise<ChatInfo> {
   // Check cache first
   const cached = chatInfoCache.get(chatId);

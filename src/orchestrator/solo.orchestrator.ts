@@ -1,7 +1,6 @@
-import { sendReaction, type Reaction } from "../linq/index.js";
+import { createGroupChat, sendReaction, type Reaction } from "../linq/index.js";
 import { resolveContacts } from "../services/contact.service.js";
 import { storeBotMessage } from "../services/conversation.service.js";
-import { createGroupChat } from "../services/linq.service.js";
 import { detectIntent } from "../services/llm.service.js";
 
 // ✅ Define input type
@@ -56,7 +55,7 @@ export async function soloOrchestrator({
       console.log("👥 Final participants:", allParticipants);
 
       // ✅ Create group chat
-      const newChatId = await createGroupChat(sender, allParticipants);
+      const newChatId = await createGroupChat("Trip Planning Group",sender, allParticipants);
 
       // await storeBotMessage({
       //   chatId : newChatId,
