@@ -16,10 +16,28 @@ const conversationSchema = new mongoose.Schema({
   // Track the state of the Vacation planning
   vacationState: { 
     type: String, 
-    enum: ["destination", "itinerary", "accommodation", "booking", "finalized"],
+    enum: ["destination", "itinerary", "accommodation", "complete"],
     default: "destination" 
   },
   participants: [{ type: String }], // Array of sender handles
+  accommodation: {
+  flights: {
+    airline: { type: String, default: null },
+    departure: { type: String, default: null },
+    arrival: { type: String, default: null },
+    pricePerPerson: { type: Number, default: null },
+    bookingLink: { type: String, default: null },
+    confirmedBy: [{ type: String }],
+    confirmedAt: { type: Date, default: null },
+  },
+  hotel: {
+    name: { type: String, default: null },
+    pricePerNight: { type: Number, default: null },
+    bookingLink: { type: String, default: null },
+    confirmedBy: [{ type: String }],
+    confirmedAt: { type: Date, default: null },
+  },
+},
   
   // ✈️ NEW: Core Vacation Details
   destination: { 

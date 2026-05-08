@@ -19,7 +19,7 @@ export async function searchPlacesInCity(
 ): Promise<PlaceResult[]> {
   if (!SERPAPI_API_KEY) throw new Error("SERPAPI_API_KEY not configured");
 
-  console.log(`🗺️ Searching Google Maps via SerpAPI: "${query} in ${city}"`);
+  console.log(`[Google Maps] Searching Google Maps via SerpAPI: "${query} in ${city}"`);
 
   const data = await getJson({
     engine: "google_maps",
@@ -30,7 +30,7 @@ export async function searchPlacesInCity(
 
   const results = data.local_results ?? [];
 
-  console.log(`✅ SerpAPI returned ${results.length} places`);
+  console.log(`[Google Maps] SerpAPI returned ${results.length} places`);
 
   return results.slice(0, limit).map((p: any) => ({
     name: p.title,

@@ -11,6 +11,7 @@ export function routeDecision(state: VacationGraphState) {
     const target = state.decision?.targetAgent;
     if (target === "destination") return "destinationAgent";
     if (target === "itinerary") return "itineraryAgent";
+    if (target === "accommodation") return "accommodationAgent"; // accommodation agent not built yet, route to itinerary for now
   }
 
   return END;

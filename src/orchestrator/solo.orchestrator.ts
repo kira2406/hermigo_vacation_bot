@@ -36,7 +36,7 @@ export async function soloOrchestrator({
   try {
     const parsed: IntentResponse = await detectIntent(text);
 
-    console.log("🧠 Intent parsed:", parsed);
+    console.log("[Solo Orchestrator] Intent parsed:", parsed);
 
     if (parsed.intent === "create_trip") {
       // ✅ Resolve participants
@@ -48,11 +48,11 @@ export async function soloOrchestrator({
       ];
 
       if (allParticipants.length < 2) {
-        console.log("⚠️ Not enough participants to create group");
+        console.log("[Solo Orchestrator] Not enough participants to create group");
         return;
       }
 
-      console.log("👥 Final participants:", allParticipants);
+      console.log("[Solo Orchestrator] Final participants:", allParticipants);
 
       // ✅ Create group chat
       const newChatId = await createGroupChat("Trip Planning Group",sender, allParticipants);
@@ -66,6 +66,6 @@ export async function soloOrchestrator({
     }
 
   } catch (err) {
-    console.error("❌ soloOrchestrator error:", err);
+    console.error("[Solo Orchestrator] soloOrchestrator error:", err);
   }
 }

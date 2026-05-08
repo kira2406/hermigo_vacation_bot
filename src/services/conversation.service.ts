@@ -123,7 +123,7 @@ export async function storeReaction({
 
 export async function updateVacationState(
   chatId: string,
-  vacationState: "destination" | "itinerary" | "accommodation" | "brainstorming" | "booking" | "finalized"
+  vacationState: "destination" | "itinerary" | "accommodation" | "complete"
 ): Promise<void> {
   try {
     await Conversation.findOneAndUpdate(
@@ -168,9 +168,9 @@ export async function updateTravelDates(
       { travelDates: { startDate, endDate } },
       { new: true }
     );
-    console.log(`📅 Travel dates updated for chat: ${chatId} → ${startDate.toDateString()} to ${endDate.toDateString()}`);
+    console.log(`[MongoDB] Travel dates updated for chat: ${chatId} → ${startDate.toDateString()} to ${endDate.toDateString()}`);
   } catch (error) {
-    console.error(`❌ Failed to update travel dates for chatId ${chatId}:`, error);
+    console.error(`[MongoDB] Failed to update travel dates for chatId ${chatId}:`, error);
     throw error;
   }
 }
@@ -185,9 +185,116 @@ export async function updateItinerary(
       { itinerary },
       { new: true }
     );
-    console.log(`🗺️ Itinerary updated for chat: ${chatId} with ${itinerary.length} activities`);
+    console.log(`[MongoDB] Itinerary updated for chat: ${chatId} with ${itinerary.length} activities`);
   } catch (error) {
-    console.error(`❌ Failed to update itinerary for chatId ${chatId}:`, error);
+    console.error(`[MongoDB] Failed to update itinerary for chatId ${chatId}:`, error);
     throw error;
+  }
+}
+
+
+export async function updateAccommodation(
+  chatId: string,
+  accommodation: {
+    hotel: string;
+    confirmedBy: string[];
+  }
+): Promise<void> {
+  try {
+    await Conversation.findOneAndUpdate(
+      { chatId },
+      { accommodation },
+      { new: true }
+    );
+    console.log(`[MongoDB] Accommodation updated for chat: ${chatId} — ${accommodation.hotel}`);
+  } catch (error) {
+    console.error(`[MongoDB] Failed to update accommodation for chatId ${chatId}:`, error);
+    throw error;
+  }
+}
+
+export async function confirmFlights(
+  chatId: string,
+  flights: {
+    airline: string;
+    departure: string;
+    arrival: string;
+    pricePerPerson: number;
+    confirmedBy: string[];
+  }
+): Promise<void> {
+  try {
+    await Conversation.findOneAndUpdate(
+      { chatId },
+      {
+        "accommodation.flights": {
+          ...flights,
+          confirmedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+    console.log(`[MongoDB] Flights confirmed for chat: ${chatId} — ${flights.airline}`);
+  } catch (error) {
+    console.error(`[MongoDB] Failed to confirm flights for chatId ${chatId}:`, error);
+    throw error;
+  }
+}
+
+export async function confirmHotel(
+  chatId: string,
+  hotel: {
+    hotel: string;
+    pricePerNight: number;
+    confirmedBy: string[];
+  }
+): Promise<void> {
+  try {
+    await Conversation.findOneAndUpdate(
+      { chatId },
+      {
+        "accommodation.hotel": {
+          name: hotel.hotel,
+          pricePerNight: hotel.pricePerNight,
+          confirmedBy: hotel.confirmedBy,
+          confirmedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+    console.log(`[MongoDB] Hotel confirmed for chat: ${chatId} — ${hotel.hotel}`);
+  } catch (error) {
+    console.error(`[MongoDB] Failed to confirm hotel for chatId ${chatId}:`, error);
+    throw error;
+  }
+}
+
+export async function getConfirmedFlightLink(
+  chatId: string
+): Promise<string | null> {
+  try {
+    const conversation = await Conversation.findOne(
+      { chatId },
+      { "accommodation.flights.bookingLink": 1 }
+    );
+    return conversation?.accommodation?.flights?.bookingLink ?? null;
+  } catch (error) {
+    console.error(`[MongoDB] Failed to fetch flight booking link for chatId ${chatId}:`, error);
+    return null;
+  }
+}
+
+export async function getConfirmedHotelLink(
+  chatId: string
+): Promise<string | null> {
+  try {
+    const conversation = await Conversation.findOne(
+      { chatId },
+      { "accommodation.hotel.bookingLink": 1 }
+    );
+    return conversation?.accommodation?.hotel?.bookingLink ?? null;
+  } catch (error) {
+    console.error(`[MongoDB] Failed to fetch hotel booking link for chatId ${chatId}:`, error);
+    return null;
   }
 }

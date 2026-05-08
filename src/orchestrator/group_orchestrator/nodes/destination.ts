@@ -1,4 +1,4 @@
-import { destinationAgent } from "../../../agents/destination.agent.js";
+import { destinationAgent } from "../../agents/destination.agent.js";
 import type { VacationGraphState } from "../state.js";
 
 export async function destinationNode(

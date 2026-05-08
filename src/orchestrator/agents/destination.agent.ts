@@ -1,41 +1,18 @@
-import OpenAI from "openai";
-import { searchTripadvisorPlaces } from "./tools/tripadvisor.tool.js";
-import { updateVacationState, updateDestination, storeBotMessage, storeReaction } from "../services/conversation.service.js";
+import Anthropic from "@anthropic-ai/sdk";
+import { searchTripadvisorPlaces } from "./tools/serp.tool.js";
+import {
+  updateVacationState,
+  updateDestination,
+  storeBotMessage,
+  storeReaction,
+} from "../../services/conversation.service.js";
 import { DATA_RETRIEVAL_TOOLS, destinationTools } from "./tools/index.js";
-import { sendMessage, sendReaction, type Reaction } from "../linq/client.js";
+import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
 
-const openai = new OpenAI();
-const MAX_TOOL_LOOPS = 5
+const anthropic = new Anthropic();
+const MAX_TOOL_LOOPS = 5;
 const DRY_RUN = process.env.DRY_RUN === "true";
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
-type DestinationAgentArgs = {
-  query: string;
-  limit?: number;
-};
-
-const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
-  {
-    type: "function",
-    function: {
-      name: "search_tripadvisor_attractions",
-      description: "Search for attractions and activities on TripAdvisor for a given city.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "City and activity type (e.g. 'Tokyo hiking' or 'Paris art museums')",
-          },
-          limit: { type: "number", default: 5 },
-        },
-        required: ["query"],
-      },
-    },
-  },
-];
-
-const FALLBACK = "I looked into some options but couldn't form a response.";
 
 const SYSTEM_MESSAGE = `
 You are a destination specialist for a vacation planner accessible via text message in a group chat.
@@ -75,7 +52,6 @@ CRITICAL: Mirror how humans actually text:
 - Use "---" to split your response into separate messages sent individually
 - Each message should be 1-2 sentences max
 - ALWAYS split longer responses with ---
-- This is NOT optional
 
 Guidelines:
 - NO markdown (no bullets, headers, bold, numbered lists)
@@ -110,7 +86,6 @@ RULES:
 3. Never write "[reacted with ...]" in your text
 `;
 
-
 export async function destinationAgent(
   chatId: string,
   messageId: string | undefined,
@@ -118,60 +93,45 @@ export async function destinationAgent(
   recent_history: string,
   participantCount: number
 ): Promise<void> {
-  
-   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+  const messages: Anthropic.MessageParam[] = [
     {
-      role: "system",
-      content: `${SYSTEM_MESSAGE}\n\nThe group has ${participantCount} people. ALL ${participantCount} must agree before calling confirm_destination.`,
+      role: "user",
+      content: `
+${SYSTEM_MESSAGE}
+
+The group has ${participantCount} people. ALL ${participantCount} must agree before calling confirm_destination.
+
+Conversation history:
+${history}
+      `.trim(),
     },
-    { role: "user", content: history },
   ];
 
-  let response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages,
+  let response = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1024,
     tools: destinationTools,
-    tool_choice: "auto",
-    temperature: 0.2,
+    messages,
   });
 
   let loopCount = 0;
 
-  while (
-    response.choices[0].finish_reason === "tool_calls" &&
-    loopCount < MAX_TOOL_LOOPS
-  ) {
-    const assistantMessage = response.choices[0].message;
-    const toolCalls = assistantMessage.tool_calls ?? [];
-
-    // Append assistant message to history
-    messages.push(assistantMessage);
-
-    const hasDataTools = toolCalls.some(
-      (tc) =>
-        tc.type === "function" &&
-        DATA_RETRIEVAL_TOOLS.destination.has(tc.function.name)
+  while (response.stop_reason === "tool_use" && loopCount < MAX_TOOL_LOOPS) {
+    const toolUseBlocks = response.content.filter(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
     );
 
-    const toolResults: OpenAI.Chat.Completions.ChatCompletionToolMessageParam[] = [];
+    messages.push({ role: "assistant", content: response.content });
 
-    for (const toolCall of toolCalls) {
-      if (toolCall.type !== "function") continue;
+    const hasDataTools = toolUseBlocks.some((b) =>
+      DATA_RETRIEVAL_TOOLS?.destination?.has(b.name)
+    );
 
-      const { name, arguments: rawArgs } = toolCall.function;
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
-      let args: any;
-      try {
-        args = JSON.parse(rawArgs);
-      } catch {
-        console.error(`[destination] Failed to parse args for: ${name}`);
-        toolResults.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: "Error: failed to parse arguments",
-        });
-        continue;
-      }
+    for (const block of toolUseBlocks) {
+      const { id, name, input } = block;
+      const args = input as any;
 
       // ── search_tripadvisor_attractions ──────────────────────────────────
 
@@ -182,20 +142,23 @@ export async function destinationAgent(
           console.log(`[destination] tripadvisor returned ${result?.length ?? 0} results`);
 
           const formattedResults = (result || [])
-          .map((place: any) => `${place.title} - ${place.description || "No description available"} - Location: ${place.location} - Ratings: ${place.rating || "N/A"}`)
-          .join("\n");
+            .map(
+              (place: any) =>
+                `${place.title} - ${place.description || "No description available"} - Location: ${place.location} - Ratings: ${place.rating || "N/A"}`
+            )
+            .join("\n");
 
           toolResults.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
+            type: "tool_result",
+            tool_use_id: id,
             content: formattedResults || "No results found",
           });
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           console.error(`[destination] tripadvisor error:`, msg);
           toolResults.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
+            type: "tool_result",
+            tool_use_id: id,
             content: `Error searching TripAdvisor: ${msg}`,
           });
         }
@@ -203,7 +166,6 @@ export async function destinationAgent(
       // ── send_message ────────────────────────────────────────────────────
 
       } else if (name === "send_message") {
-
         const parts = (args.content as string)
           .split("---")
           .map((p: string) => cleanResponse(p.trim()))
@@ -219,7 +181,7 @@ export async function destinationAgent(
         }
 
         await storeBotMessage({ chatId, content: args.content });
-        toolResults.push({ role: "tool", tool_call_id: toolCall.id, content: "ok" });
+        toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
 
       // ── send_reaction ───────────────────────────────────────────────────
 
@@ -241,7 +203,13 @@ export async function destinationAgent(
           rawPayload: {},
         });
         console.log(`[destination] reacted with: ${args.emoji}`);
-        toolResults.push({ role: "tool", tool_call_id: toolCall.id, content: "ok" });
+        toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
+
+      // ── ignore ──────────────────────────────────────────────────────────
+
+      } else if (name === "ignore") {
+        console.log(`[destination] ignoring: ${args.reasoning}`);
+        toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
 
       // ── confirm_destination ─────────────────────────────────────────────
 
@@ -251,40 +219,32 @@ export async function destinationAgent(
         await updateVacationState(chatId, "itinerary");
         console.log(`[destination] Destination confirmed: ${city} → itinerary`);
         toolResults.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
+          type: "tool_result",
+          tool_use_id: id,
           content: `Destination locked as ${city}. State advanced to itinerary.`,
         });
 
       } else {
         console.warn(`[destination] Unknown tool: ${name}`);
-        toolResults.push({ role: "tool", tool_call_id: toolCall.id, content: "ok" });
+        toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
       }
     }
 
-    for (const toolResult of toolResults) {
-        messages.push(toolResult);
-      }
-  
-    // Only continue loop if data tools need results fed back
-    if (hasDataTools) {
-  
-      response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages,
-        tools: destinationTools,
-        tool_choice: "auto",
-        temperature: 0.2,
-      });
+    messages.push({ role: "user", content: toolResults });
 
+    if (hasDataTools) {
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        tools: destinationTools,
+        messages,
+      });
     } else {
-      // Fire-and-forget only — we are done
       break;
     }
 
     loopCount++;
   }
-
 }
 
 function cleanResponse(text: string): string {

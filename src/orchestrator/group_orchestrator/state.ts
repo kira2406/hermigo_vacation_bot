@@ -5,9 +5,6 @@ export interface Decision {
   action: "ignore" | "delegate";
   reasoning: string;
   targetAgent?: "destination" | "itinerary" | "accommodation";
-  // isConflict?: boolean;
-  // isConsensus?: boolean;
-  // confirmedDestination?: string;
 }
 
 // Single source of truth — annotation lives here
@@ -17,7 +14,7 @@ export const VacationStateAnnotation = Annotation.Root({
   text: Annotation<string>(),
   sender: Annotation<string>(),
   participantCount: Annotation<number>(),
-  vacationState: Annotation<"destination" | "itinerary" | "accommodation" | "brainstorming" | "booking" | "finalized">(),
+  vacationState: Annotation<"destination" | "itinerary" | "accommodation" | "complete">(),
   history: Annotation<any[]>({
     reducer: (_old, next) => next,
     default: () => [],
@@ -27,7 +24,15 @@ export const VacationStateAnnotation = Annotation.Root({
     default: () => [],
   }),
   decision: Annotation<Decision | undefined>(),
+  destination: Annotation<string | undefined>(),
+  startDate: Annotation<string | undefined>(),
+  endDate: Annotation<string | undefined>(),
+  currentItinerary: Annotation<any[]>({
+    reducer: (_old, next) => next,
+    default: () => [],
+  }),
+  currentAccommodation: Annotation<any | undefined>(),
 });
 
-// Derive the interface FROM the annotation — never diverges
+// Derive the interface FROM the annotation
 export type VacationGraphState = typeof VacationStateAnnotation.State;
