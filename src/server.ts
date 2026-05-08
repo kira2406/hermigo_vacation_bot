@@ -28,19 +28,19 @@ const PORT: number = Number(process.env.PORT) || 3000;
 async function bootstrap(): Promise<void> {
   try {
     await connectDB();
-    console.log("[Database] connected");
+    console.log("✅ Database connected");
 
     await connectRabbitMQ();
-    console.log("[RabbitMQ] connected");
+    console.log("✅ RabbitMQ connected");
 
     await startWebhookWorker();
-    console.log("[Webhook worker] started");
+    console.log("✅ Webhook worker started");
 
     app.listen(PORT, () => {
-      console.log(`[Server] running on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("[Server] Failed to bootstrap server:", error);
+    console.error("❌ Failed to bootstrap server:", error);
     process.exit(1); // crash fast if any connection fails
   }
 }

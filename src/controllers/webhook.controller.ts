@@ -1,4 +1,8 @@
 import type { Request, Response } from "express";
+import { soloOrchestrator } from "../orchestrator/solo.orchestrator.js";
+// import { groupOrchestrator } from "../orchestrator/group.orchestrator.js";
+import { storeParticipantMessage } from "../services/conversation.service.js";
+import { groupOrchestrator } from "../orchestrator/group_orchestrator/index.js";
 import { publishWebhookEvent } from "../services/publisher.service.js";
 
 // ✅ Define payload shape (minimal version for now)
@@ -33,7 +37,64 @@ export async function handleWebhook(
     return res.sendStatus(200); // Acknowledge immediately
   }
   catch (err) {
-    console.error("[Webhook controller] Webhook error:", err);
+    console.error("❌ Webhook error:", err);
     return res.sendStatus(500);
   }
 }
+    // const messageId = data?.data?.message_id; // Placeholder, depends on Linq's actual payload structure
+
+//     console.log("📨 Incoming:", message);
+//     console.log("👤 Sender:", sender);
+//     console.log("👥 Is Group:", isGroup);
+
+//     // ✅ Guard clause
+//     if (!message || !sender || !chatId) {
+//       console.log("⚠️ Missing required fields");
+//       return res.sendStatus(200);
+//     }
+
+//     // 🔥 ROUTING LOGIC
+    
+//     if (isGroup) {
+      
+//       await storeParticipantMessage({
+//       chatId,
+//       isGroup,
+//       sender,
+//       content: message,
+//       rawPayload: data,
+//     });
+
+//       // await groupOrchestrator({
+//       //   text: message,
+//       //   sender,
+//       //   chatId,
+//       //   eventType: data.event_type,
+//       //   messageId
+//       // });
+
+//       await groupOrchestrator({
+//         chatId,
+//         messageId,
+//         text: message,
+//         sender,
+//         eventType: data.event_type
+//       });
+
+
+//     } else {
+//       await soloOrchestrator({
+//         text: message,
+//         sender,
+//         chatId,
+//         messageId
+//       });
+//     }
+
+//     return res.sendStatus(200);
+
+//   } catch (err) {
+//     console.error("❌ Webhook error:", err);
+//     return res.sendStatus(500);
+//   }
+// }

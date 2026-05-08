@@ -14,10 +14,10 @@ export async function connectRabbitMQ(): Promise<void> {
   // Durable: survives RabbitMQ restarts
   await channel.assertQueue(QUEUES.WEBHOOK_EVENTS, { durable: true });
 
-  console.log("[RabbitMQ] connected");
+  console.log("🐇 RabbitMQ connected");
 }
 
 export function getChannel(): Channel {
-  if (!channel) throw new Error("[RabbitMQ] channel not initialized");
+  if (!channel) throw new Error("RabbitMQ channel not initialized");
   return channel;
 }

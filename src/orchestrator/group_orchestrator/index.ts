@@ -6,7 +6,6 @@ import { itineraryNode } from "./nodes/itinerary.js";
 import { executionNode } from "./nodes/execution.js";
 import { routeDecision } from "./router.js";
 import { getOrCreateConversation } from "../../services/conversation.service.js";
-import { accommodationNode } from "./nodes/accommodation.js";
 
 export interface GroupOrchestratorParams {
   chatId: string;
@@ -26,21 +25,21 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
       .addNode("orchestrator", orchestratorNode)
       .addNode("destinationAgent", destinationNode)
       .addNode("itineraryAgent", itineraryNode)
-      .addNode("accommodationAgent", accommodationNode)
+      .addNode("execute", executionNode)
       .addEdge(START, "orchestrator")
       .addConditionalEdges("orchestrator", routeDecision, {
+        execute: "execute",
         destinationAgent: "destinationAgent",
         itineraryAgent: "itineraryAgent",
-        accommodationAgent: "accommodationAgent",
         [END]: END,
       })
-      .addEdge("destinationAgent", END)
-      .addEdge("itineraryAgent", END)
-      .addEdge("accommodationAgent", END)
+      .addEdge("destinationAgent", "execute")
+      .addEdge("itineraryAgent", "execute")
+      .addEdge("execute", END);
 
     const app = workflow.compile();
 
-    await app.invoke({
+    const result = await app.invoke({
       chatId,
       messageId,
       text,
@@ -48,14 +47,11 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
       participantCount: conversation.participants?.length || 3,
       vacationState: conversation.vacationState || "destination",
       history: conversation.events?.slice(-15) || [],
-      recent_messages: conversation.events?.slice(-4) || [],
-      destination: conversation.destination || null,
-      startDate: conversation.travelDates?.startDate || null,
-      endDate: conversation.travelDates?.endDate || null,
-      currentItinerary: conversation.itinerary || [],
-      currentAccommodation: conversation.accommodation || null,
     });
 
+    console.log("🤖 LLM Decision:", JSON.stringify(result.decision, null, 2));
+
+    return result;
   } catch (error) {
     console.error("❌ LangGraph Orchestration Error:", error);
     throw error;
