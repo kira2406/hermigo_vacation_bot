@@ -8,7 +8,9 @@ export function routeDecision(state: VacationGraphState) {
   if (action === "react" || action === "reply") return "execute";
 
   if (action === "delegate") {
-    if (state.decision?.targetAgent === "destination") return "destinationAgent";
+    const target = state.decision?.targetAgent;
+    if (target === "destination") return "destinationAgent";
+    if (target === "itinerary") return "itineraryAgent";
   }
 
   return END;
