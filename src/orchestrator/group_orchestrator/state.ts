@@ -1,17 +1,8 @@
 import { Annotation } from "@langchain/langgraph";
 
-type BuiltInReaction =
-  | "love"
-  | "like"
-  | "dislike"
-  | "laugh"
-  | "emphasize"
-  | "question";
-
 // Decision shape
 export interface Decision {
-  action: "reply" | "react" | "ignore" | "delegate";
-  content?: string | BuiltInReaction; // The message text to send, or the emoji to react with
+  action: "ignore" | "delegate";
   reasoning: string;
   targetAgent?: "destination" | "itinerary" | "accommodation";
   // isConflict?: boolean;
@@ -28,6 +19,10 @@ export const VacationStateAnnotation = Annotation.Root({
   participantCount: Annotation<number>(),
   vacationState: Annotation<"destination" | "itinerary" | "accommodation" | "brainstorming" | "booking" | "finalized">(),
   history: Annotation<any[]>({
+    reducer: (_old, next) => next,
+    default: () => [],
+  }),
+  recent_messages: Annotation<any[]>({
     reducer: (_old, next) => next,
     default: () => [],
   }),

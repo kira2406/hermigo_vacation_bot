@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import {
   searchPlacesInCity,
   groupNearbyPlaces,
-} from "../tools/google-maps.tool.js";
+} from "./tools/google-maps.tool.js";
 import {
   updateTravelDates,
   updateItinerary,

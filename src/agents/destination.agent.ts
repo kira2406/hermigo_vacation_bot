@@ -1,8 +1,13 @@
 import OpenAI from "openai";
-import { searchTripadvisorPlaces } from "../tools/tripadvisor.tool.js";
-import { updateVacationState, updateDestination } from "../services/conversation.service.js";
+import { searchTripadvisorPlaces } from "./tools/tripadvisor.tool.js";
+import { updateVacationState, updateDestination, storeBotMessage, storeReaction } from "../services/conversation.service.js";
+import { DATA_RETRIEVAL_TOOLS, destinationTools } from "./tools/index.js";
+import { sendMessage, sendReaction, type Reaction } from "../linq/client.js";
 
 const openai = new OpenAI();
+const MAX_TOOL_LOOPS = 5
+const DRY_RUN = process.env.DRY_RUN === "true";
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 type DestinationAgentArgs = {
   query: string;
@@ -30,178 +35,265 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
-const availableFunctions: Record<string, (args: DestinationAgentArgs) => Promise<any>> = {
-  search_tripadvisor_attractions: async ({ query, limit }) => {
-    return await searchTripadvisorPlaces(query, "A", limit);
-  },
-};
-
 const FALLBACK = "I looked into some options but couldn't form a response.";
 
-export type DestinationAgentResult = {
-  action: "ignore" | "react" | "reply";
-  content: string;
-  confirmedDestination?: string;
-  advanceState: boolean;
-};
+const SYSTEM_MESSAGE = `
+You are a destination specialist for a vacation planner accessible via text message in a group chat.
+
+## What You Do
+- Help groups decide on a travel destination by suggesting activities and tourism options
+- Search TripAdvisor for activities and attractions in cities
+- Recommend destinations when groups are in conflict
+- Confirm the destination once the group reaches full consensus
+
+## Tools
+- "search_tripadvisor_attractions": Use when you need real data about a city's attractions
+- "send_message": Send a text to the group with the search results. YOU MUST INCLUDE the attractions from the search in your message.
+- "send_reaction": React to the latest message — use sparingly.
+- "confirm_destination": Call THIS when:
+  1. You've already shown the group attractions for a city AND
+  2. The group has explicitly agreed/confirmed the location (e.g., "yes", "let's go", "confirmed", "shanghai is perfect")
+  DO NOT call this on first search — wait for explicit agreement from the group.
+
+## Workflow
+1. Group debating → SEARCH for cities
+2. After SEARCH → SEND_MESSAGE with attractions
+3. Group says "yes, let's confirm" or similar → SEND_MESSAGE acknowledging + CONFIRM_DESTINATION
+4. CONFIRM_DESTINATION locks in the city and advances to itinerary planning
+
+## CRITICAL
+- ALWAYS include search results in send_message
+- Format each attraction as: "Place Name : One sentence description"
+- Use --- to separate each attraction into its own message part
+- ONLY call confirm_destination when the group has EXPLICITLY asked to confirm/lock in the location
+- After confirm_destination, do NOT send more messages — the state has advanced
+
+## Response Style
+You are texting — write like a helpful friend.
+
+CRITICAL: Mirror how humans actually text:
+- Use "---" to split your response into separate messages sent individually
+- Each message should be 1-2 sentences max
+- ALWAYS split longer responses with ---
+- This is NOT optional
+
+Guidelines:
+- NO markdown (no bullets, headers, bold, numbered lists)
+- Be concise and conversational
+- Skip apostrophes — "dont", "cant", "im", "thats"
+- No ratings, no links, no image references
+
+CONFLICT response style:
+- Brief recommendation with a one-line reason
+- Top 3-5 activities: "Place Name : One sentence"
+- Separate each with ---
+
+CONSENSUS response style:
+- "Here's what to do in [city]:"
+- Top 5 attractions: "Place Name : One sentence"
+- Separate each with ---
+- End with --- and a short question like "How do these sound?"
+
+Then when group confirms:
+- "Awesome! [City] it is!" or similar acknowledgment
+- Call confirm_destination to lock it in
+
+## Reactions
+React to messages sparingly — text responses are always preferred. Use reactions only as supplements.
+
+Standard: love, like, dislike, laugh, emphasize, question
+Custom: any emoji
+
+RULES:
+1. Default to text — reactions are supplementary
+2. Never react without also sending text unless its truly just an acknowledgment
+3. Never write "[reacted with ...]" in your text
+`;
+
 
 export async function destinationAgent(
   chatId: string,
+  messageId: string | undefined,
   history: string,
+  recent_history: string,
   participantCount: number
-): Promise<DestinationAgentResult> {
-  const systemMessage = `
-  You are a destination specialist for a group vacation planner.
-  The group has ${participantCount} people.
-
-  Read the conversation history and decide the best action:
-
-  ACTIONS:
-  1. "ignore" — The group is still casually chatting about locations. Not enough signal yet.
-  2. "react" — A simple reaction is enough (e.g. someone shared excitement about a city). 
-     Pick one: "love" | "like" | "dislike" | "laugh" | "emphasize" | "question"
-  3. "reply" — You can answer a simple location-related question directly without searching.
-  4. "search_and_reply" — Deep dive needed. Use this when:
-     - CONFLICT: Group is debating between cities → search each city → recommend best one
-     - CONSENSUS: Group agreed on a destination → search activities there → list them
-     - UNDECIDED: Group needs suggestions → search based on their interests
-
-  RESPONSE STYLE FOR "search_and_reply":
-
-  CONFLICT:
-  - Analyze the contested locations and recommend the best one for the group
-  - Keep it short and conversational — like a text message
-  - Only include: your recommendation and a brief one-line reason why
-  - Then list the top 3-5 activities as a simple bullet list
-  - Nothing else — no ratings, no links, no images
-
-  CONSENSUS:
-  - Give a short heading like "Here's what to do in [city]:" followed by a newline
-  - Each item must be formatted as: "Place Name : One short sentence description"
-  - Separate each ITEM with "---" (not the name and description)
-  - End with "---" followed by a short engaging question to the group like "How do these sound?"
-  - No ratings, no links, no images, no extra commentary
-
-  UNDECIDED:
-  - Gently prompt the group to narrow down their options
-  - Keep it to 1-2 sentences
-
-  FOR "search_and_reply" ONLY, also set:
-  - "situation": "conflict" | "consensus" | "undecided"
-  - "confirmedDestination": "<city name>" if situation is "consensus", otherwise null
-
-  RESPONSE FORMAT (strict JSON):
-  {
-    "action": "ignore" | "react" | "reply" | "search_and_reply",
-    "situation": "conflict" | "consensus" | "undecided" | null,
-    "confirmedDestination": "City name or null",
-    "content": "Message if reply/search_and_reply, emoji if react, blank if ignore",
-    "reasoning": "Brief explanation"
-  }
-
-  Keep replies short and conversational like a text message.
-  Use "---" to split longer replies into separate messages.
-  No markdown, no headers, no bold text.
-`;
-
-  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemMessage },
+): Promise<void> {
+  
+   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    {
+      role: "system",
+      content: `${SYSTEM_MESSAGE}\n\nThe group has ${participantCount} people. ALL ${participantCount} must agree before calling confirm_destination.`,
+    },
     { role: "user", content: history },
   ];
 
-  const response = await openai.chat.completions.create({
+  let response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages,
-    tools,
+    tools: destinationTools,
     tool_choice: "auto",
     temperature: 0.2,
-    response_format: { type: "json_object" },
   });
 
-  const responseMessage = response.choices[0].message;
-  const toolCalls = responseMessage.tool_calls;
+  let loopCount = 0;
 
-  if (toolCalls && toolCalls.length > 0) {
-    messages.push(responseMessage);
+  while (
+    response.choices[0].finish_reason === "tool_calls" &&
+    loopCount < MAX_TOOL_LOOPS
+  ) {
+    const assistantMessage = response.choices[0].message;
+    const toolCalls = assistantMessage.tool_calls ?? [];
+
+    // Append assistant message to history
+    messages.push(assistantMessage);
+
+    const hasDataTools = toolCalls.some(
+      (tc) =>
+        tc.type === "function" &&
+        DATA_RETRIEVAL_TOOLS.destination.has(tc.function.name)
+    );
+
+    const toolResults: OpenAI.Chat.Completions.ChatCompletionToolMessageParam[] = [];
 
     for (const toolCall of toolCalls) {
       if (toolCall.type !== "function") continue;
 
-      const functionName = toolCall.function.name;
-      const fn = availableFunctions[functionName];
+      const { name, arguments: rawArgs } = toolCall.function;
 
-      if (!fn) {
-        console.warn(`⚠️ Unknown tool: ${functionName}`);
-        continue;
-      }
-
-      let args: DestinationAgentArgs;
+      let args: any;
       try {
-        args = JSON.parse(toolCall.function.arguments);
+        args = JSON.parse(rawArgs);
       } catch {
-        console.error(`⚠️ Failed to parse args for tool: ${functionName}`);
+        console.error(`[destination] Failed to parse args for: ${name}`);
+        toolResults.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: "Error: failed to parse arguments",
+        });
         continue;
       }
 
-      console.log(`🔧 Calling tool [${functionName}] with args:`, args);
-      const toolResult = await fn(args);
-      console.log(`✅ Tool [${functionName}] returned:`, JSON.stringify(toolResult, null, 2));
+      // ── search_tripadvisor_attractions ──────────────────────────────────
 
-      messages.push({
-        role: "tool",
-        tool_call_id: toolCall.id,
-        content: JSON.stringify(toolResult),
-      });
+      if (name === "search_tripadvisor_attractions") {
+        try {
+          console.log(`[destination] searching tripadvisor for: "${args.query}"`);
+          const result = await searchTripadvisorPlaces(args.query, "A", args.limit);
+          console.log(`[destination] tripadvisor returned ${result?.length ?? 0} results`);
+
+          const formattedResults = (result || [])
+          .map((place: any) => `${place.title} - ${place.description || "No description available"} - Location: ${place.location} - Ratings: ${place.rating || "N/A"}`)
+          .join("\n");
+
+          toolResults.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: formattedResults || "No results found",
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          console.error(`[destination] tripadvisor error:`, msg);
+          toolResults.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: `Error searching TripAdvisor: ${msg}`,
+          });
+        }
+
+      // ── send_message ────────────────────────────────────────────────────
+
+      } else if (name === "send_message") {
+
+        const parts = (args.content as string)
+          .split("---")
+          .map((p: string) => cleanResponse(p.trim()))
+          .filter(Boolean);
+
+        for (const part of parts) {
+          if (DRY_RUN) {
+            console.log(`[DRY RUN] reply: "${part}"`);
+          } else {
+            await sendMessage(chatId, part);
+            await delay(1500);
+          }
+        }
+
+        await storeBotMessage({ chatId, content: args.content });
+        toolResults.push({ role: "tool", tool_call_id: toolCall.id, content: "ok" });
+
+      // ── send_reaction ───────────────────────────────────────────────────
+
+      } else if (name === "send_reaction") {
+        if (!messageId) {
+          console.warn("[destination] Cannot react: messageId is undefined");
+        } else if (DRY_RUN) {
+          console.log(`[DRY RUN] react: "${args.emoji}"`);
+        } else {
+          await sendReaction(messageId, { type: args.emoji } as Reaction, "add");
+        }
+
+        await storeReaction({
+          chatId,
+          isGroup: true,
+          sender: "VacationBot",
+          reaction: args.emoji,
+          actorType: "bot",
+          rawPayload: {},
+        });
+        console.log(`[destination] reacted with: ${args.emoji}`);
+        toolResults.push({ role: "tool", tool_call_id: toolCall.id, content: "ok" });
+
+      // ── confirm_destination ─────────────────────────────────────────────
+
+      } else if (name === "confirm_destination") {
+        const city = args.city as string;
+        await updateDestination(chatId, city);
+        await updateVacationState(chatId, "itinerary");
+        console.log(`[destination] Destination confirmed: ${city} → itinerary`);
+        toolResults.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: `Destination locked as ${city}. State advanced to itinerary.`,
+        });
+
+      } else {
+        console.warn(`[destination] Unknown tool: ${name}`);
+        toolResults.push({ role: "tool", tool_call_id: toolCall.id, content: "ok" });
+      }
     }
 
-    const secondResponse = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages,
-      response_format: { type: "json_object" },
-    });
+    for (const toolResult of toolResults) {
+        messages.push(toolResult);
+      }
+  
+    // Only continue loop if data tools need results fed back
+    if (hasDataTools) {
+  
+      response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages,
+        tools: destinationTools,
+        tool_choice: "auto",
+        temperature: 0.2,
+      });
 
-    return parseAgentResult(chatId, secondResponse.choices[0].message.content ?? "{}");
+    } else {
+      // Fire-and-forget only — we are done
+      break;
+    }
+
+    loopCount++;
   }
 
-  return parseAgentResult(chatId, responseMessage.content ?? "{}");
 }
 
-async function parseAgentResult(
-  chatId: string,
-  raw: string
-): Promise<DestinationAgentResult> {
-  try {
-    const parsed = JSON.parse(raw);
-    const action = parsed.action as "ignore" | "react" | "reply" | "search_and_reply";
-    const situation = parsed.situation as "conflict" | "consensus" | "undecided" | null;
-    const content = parsed.content ?? "";
-    const confirmedDestination = parsed.confirmedDestination ?? undefined;
-
-    console.log(`🗺️ Destination Agent action: [${action}] situation: [${situation}]`);
-    console.log(`🗺️ Destination Agent content: ${content}`);
-
-    // Consensus — save to DB and advance state
-    if (action === "search_and_reply" && situation === "consensus" && confirmedDestination) {
-      await updateDestination(chatId, confirmedDestination);
-      await updateVacationState(chatId, "itinerary");
-      console.log(`✅ Destination locked: ${confirmedDestination} → state advanced to itinerary`);
-
-      return {
-        action: "reply",
-        content,
-        confirmedDestination,
-        advanceState: true,
-      };
-    }
-
-    // All other cases — map search_and_reply to reply for execution node
-    return {
-      action: action === "search_and_reply" ? "reply" : action,
-      content,
-      advanceState: false,
-    };
-  } catch {
-    console.error("❌ Failed to parse destination agent result:", raw);
-    return { action: "reply", content: FALLBACK, advanceState: false };
-  }
+function cleanResponse(text: string): string {
+  return text
+    .replace(/\n\s*-\s*/g, " - ")
+    .replace(/(?<!\w)_([^_]+)_(?!\w)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/(?<!\w)\*([^*]+)\*(?!\w)/g, "$1")
+    .replace(/  +/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

@@ -1,7 +1,7 @@
 // src/tools/tripadvisor.tool.ts
 import { getJson } from "serpapi";
 import dotenv from "dotenv";
-import type { TripadvisorPlace } from "../services/tripadvisor.service.js";
+import type { TripadvisorPlace } from "../../services/tripadvisor.service.js";
 
 dotenv.config();
 
@@ -26,21 +26,14 @@ export async function searchTripadvisorPlaces(
     api_key: process.env.SERPAPI_API_KEY,
   };
 
-  console.log("🚀 --- SERPAPI REQUEST BODY --- 🚀");
-  console.log(JSON.stringify(params, null, 2));
-
   // 2. Execute Request
   const results = await getJson(params);
 
-  // 3. Log the Full Response Body
-  console.log("📦 --- SERPAPI RESPONSE BODY --- 📦");
-  console.log(JSON.stringify(results, null, 2));
-
   // 4. Verification Logs
   if (results.search_metadata?.status === "Success") {
-    console.log(`✅ Success: Found ${results.places?.length || 0} places.`);
+    console.log(`[SERPAPI] Success: Found ${results.places?.length || 0} places.`);
   } else {
-    console.log("⚠️ Warning: Search metadata status is not 'Success'");
+    console.log("[SERPAPI] Warning: Search metadata status is not 'Success'");
   }
 
   return (results.places ?? []).slice(0, limit);

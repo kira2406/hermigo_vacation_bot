@@ -25,21 +25,18 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
       .addNode("orchestrator", orchestratorNode)
       .addNode("destinationAgent", destinationNode)
       .addNode("itineraryAgent", itineraryNode)
-      .addNode("execute", executionNode)
       .addEdge(START, "orchestrator")
       .addConditionalEdges("orchestrator", routeDecision, {
-        execute: "execute",
         destinationAgent: "destinationAgent",
         itineraryAgent: "itineraryAgent",
         [END]: END,
       })
-      .addEdge("destinationAgent", "execute")
-      .addEdge("itineraryAgent", "execute")
-      .addEdge("execute", END);
+      .addEdge("destinationAgent", END)
+      .addEdge("itineraryAgent", END)
 
     const app = workflow.compile();
 
-    const result = await app.invoke({
+    await app.invoke({
       chatId,
       messageId,
       text,
@@ -47,11 +44,9 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
       participantCount: conversation.participants?.length || 3,
       vacationState: conversation.vacationState || "destination",
       history: conversation.events?.slice(-15) || [],
+      recent_messages: conversation.events?.slice(-4) || [],
     });
 
-    console.log("🤖 LLM Decision:", JSON.stringify(result.decision, null, 2));
-
-    return result;
   } catch (error) {
     console.error("❌ LangGraph Orchestration Error:", error);
     throw error;
