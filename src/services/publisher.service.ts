@@ -15,5 +15,5 @@ export function publishWebhookEvent(payload: LinqWebhookPayload): void {
     }
   );
 
-  console.log(`📤 Event published to queue: ${messageId}`);
+  console.log(`[RabbitMQ] Event published to queue: ${messageId}`);
 }

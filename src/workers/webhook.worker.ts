@@ -10,7 +10,7 @@ export async function startWebhookWorker(): Promise<void> {
   // Only process 1 message at a time per worker instance
   channel.prefetch(1);
 
-  console.log("⚙️ Webhook worker started, waiting for events...");
+  console.log("[Webhook worker] started, waiting for events...");
 
   channel.consume(QUEUES.WEBHOOK_EVENTS, async (msg) => {
     if (!msg) return;
@@ -26,12 +26,12 @@ export async function startWebhookWorker(): Promise<void> {
       const isGroup = payload.data?.chat?.is_group;
 
       if (!message || !sender || !chatId) {
-        console.warn("⚠️ Missing required fields, discarding message");
+        console.warn("[Webhook worker] Missing required fields, discarding message");
         channel.ack(msg); // ✅ ack to remove from queue
         return;
       }
 
-      console.log(`⚙️ Processing event: ${messageId}`);
+      console.log(`[Webhook worker] Processing event: ${messageId}`);
 
       if (isGroup) {
         await storeParticipantMessage({
@@ -56,7 +56,7 @@ export async function startWebhookWorker(): Promise<void> {
       channel.ack(msg); // ✅ remove from queue on success
 
     } catch (error) {
-      console.error(`❌ Worker failed for message ${messageId}:`, error);
+      console.error(`[Webhook worker] failed for message ${messageId}:`, error);
       // nack + requeue: false = discard after failure (avoids infinite loops)
       channel.nack(msg, false, false);
     }
