@@ -2,7 +2,7 @@
 import { sendReaction, type Reaction, sendMessage } from "../../../linq/client.js";
 import { storeBotMessage, storeReaction } from "../../../services/conversation.service.js";
 import type { VacationGraphState } from "../state.js";
-
+import dotenv from 'dotenv'
 /**
  * Node: Execution Gateway
  * Handles final outputs to the Linq API and Database logging.
@@ -25,43 +25,53 @@ function cleanResponse(text: string): string {
     .trim();
 }
 
+dotenv.config();
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const DRY_RUN = process.env.DRY_RUN === "true";
 
 export async function executionNode(state: VacationGraphState): Promise<Partial<VacationGraphState>> {
-
-
   if (!state.decision) return {};
   const { action, content } = state.decision;
 
   if (action === "reply" && content) {
-
     const parts = content.split("---").map((p) => cleanResponse(p.trim())).filter(Boolean);
 
     for (const part of parts) {
-    await sendMessage(state.chatId, part); // ✅ await each one before sending next
-    await delay(1500); // ✅ pause between messages like a human would
-  }
+      if (DRY_RUN) {
+        console.log(`🧪 [DRY RUN] Would send message: "${part}"`);
+      } else {
+        await sendMessage(state.chatId, part);
+        await delay(1500);
+      }
+    }
+
     await storeBotMessage({ chatId: state.chatId, content });
-    
+
   } else if (action === "react" && content) {
     if (!state.messageId) {
       console.warn("⚠️ Cannot react: messageId is undefined");
       return {};
     }
 
-    await sendReaction(
-      state.messageId,
-      { type: content } as Reaction,
-      "add"
-    );
+    if (DRY_RUN) {
+      console.log(`🧪 [DRY RUN] Would send reaction: "${content}" to message: ${state.messageId}`);
+    } else {
+      await sendReaction(
+        state.messageId,
+        { type: content } as Reaction,
+        "add"
+      );
+    }
+
     await storeReaction({
       chatId: state.chatId,
       isGroup: true,
       sender: "VacationBot",
       reaction: content,
       actorType: "bot",
-      rawPayload: {}
+      rawPayload: {},
     });
   }
 

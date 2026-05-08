@@ -156,3 +156,38 @@ export async function updateDestination(
     throw error;
   }
 }
+
+export async function updateTravelDates(
+  chatId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<void> {
+  try {
+    await Conversation.findOneAndUpdate(
+      { chatId },
+      { travelDates: { startDate, endDate } },
+      { new: true }
+    );
+    console.log(`📅 Travel dates updated for chat: ${chatId} → ${startDate.toDateString()} to ${endDate.toDateString()}`);
+  } catch (error) {
+    console.error(`❌ Failed to update travel dates for chatId ${chatId}:`, error);
+    throw error;
+  }
+}
+
+export async function updateItinerary(
+  chatId: string,
+  itinerary: { date: Date; activity: string; confirmed: boolean }[]
+): Promise<void> {
+  try {
+    await Conversation.findOneAndUpdate(
+      { chatId },
+      { itinerary },
+      { new: true }
+    );
+    console.log(`🗺️ Itinerary updated for chat: ${chatId} with ${itinerary.length} activities`);
+  } catch (error) {
+    console.error(`❌ Failed to update itinerary for chatId ${chatId}:`, error);
+    throw error;
+  }
+}

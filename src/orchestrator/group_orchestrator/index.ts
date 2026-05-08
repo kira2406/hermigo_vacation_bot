@@ -2,6 +2,7 @@ import { StateGraph, START, END } from "@langchain/langgraph";
 import { VacationStateAnnotation, type Decision } from "./state.js"; // ← import from state
 import { orchestratorNode } from "./nodes/orchestrator.js";
 import { destinationNode } from "./nodes/destination.js";
+import { itineraryNode } from "./nodes/itinerary.js";
 import { executionNode } from "./nodes/execution.js";
 import { routeDecision } from "./router.js";
 import { getOrCreateConversation } from "../../services/conversation.service.js";
@@ -23,14 +24,17 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
     const workflow = new StateGraph(VacationStateAnnotation)
       .addNode("orchestrator", orchestratorNode)
       .addNode("destinationAgent", destinationNode)
+      .addNode("itineraryAgent", itineraryNode)
       .addNode("execute", executionNode)
       .addEdge(START, "orchestrator")
       .addConditionalEdges("orchestrator", routeDecision, {
         execute: "execute",
         destinationAgent: "destinationAgent",
+        itineraryAgent: "itineraryAgent",
         [END]: END,
       })
       .addEdge("destinationAgent", "execute")
+      .addEdge("itineraryAgent", "execute")
       .addEdge("execute", END);
 
     const app = workflow.compile();
