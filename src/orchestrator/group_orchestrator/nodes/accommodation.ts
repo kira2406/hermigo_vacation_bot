@@ -36,8 +36,8 @@ export async function accommodationNode(
       .join("\n"),
     participantCount,
     destination,
-    startDate,
-    endDate,
+    startDate ? new Date(startDate).toISOString().split("T")[0] : undefined,
+    endDate ? new Date(endDate).toISOString().split("T")[0] : undefined,
     currentAccommodation ?? null
   );
 

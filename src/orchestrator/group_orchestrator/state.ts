@@ -25,8 +25,8 @@ export const VacationStateAnnotation = Annotation.Root({
   }),
   decision: Annotation<Decision | undefined>(),
   destination: Annotation<string | undefined>(),
-  startDate: Annotation<string | undefined>(),
-  endDate: Annotation<string | undefined>(),
+  startDate: Annotation<NativeDate | undefined>(),
+  endDate: Annotation<NativeDate | undefined>(),
   currentItinerary: Annotation<any[]>({
     reducer: (_old, next) => next,
     default: () => [],

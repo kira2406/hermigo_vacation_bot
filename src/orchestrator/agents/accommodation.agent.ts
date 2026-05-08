@@ -23,8 +23,8 @@ export async function accommodationAgent(
   history: string,
   participantCount: number,
   destination: string,
-  startDate: string,
-  endDate: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
   currentAccommodation: any
 ): Promise<void> {
   const hasAccommodation = !!currentAccommodation;
