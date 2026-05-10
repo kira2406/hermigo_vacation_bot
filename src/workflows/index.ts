@@ -6,11 +6,11 @@ import { VacationStateAnnotation, type Decision } from "./state.js"; // ← impo
 import { orchestratorNode } from "./nodes/orchestrator.js";
 import { destinationNode } from "./nodes/destination.js";
 import { itineraryNode } from "./nodes/itinerary.js";
-import { getOrCreateConversation } from "../../services/conversation.service.js";
+import { getOrCreateConversation } from "../services/conversation.service.js";
 import { accommodationNode } from "./nodes/accommodation.js";
 import { routeDecision } from "./router.js";
 import { createGroupNode } from "./nodes/createGroupNode.js";
-import { startTyping, stopTyping } from "../../linq/client.js";
+import { startTyping, stopTyping } from "../linq/client.js";
 
 export interface GroupOrchestratorParams {
   chatId: string;
@@ -48,6 +48,7 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
 
     const app = workflow.compile();
 
+    await startTyping(chatId); // start typing indicator
     await app.invoke({
       chatId,
       messageId,
@@ -70,7 +71,7 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
     console.error("[Orchestration] Error:", error);
     throw error;
   }
-  // finally {
-  //   await stopTyping(chatId); // always stop, even on error
-  // }
+  finally {
+    await stopTyping(chatId); // always stop, even on error
+  }
 }

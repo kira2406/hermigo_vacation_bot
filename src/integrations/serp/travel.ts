@@ -1,11 +1,6 @@
-// src/tools/serp.tool.ts
+// src/integrations/serpapi/travel.ts
 import { getJson } from "serpapi";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import { env } from "../../config/env.js";
 
 type TripadvisorSearchType = "a" | "r" | "A" | "h" | "g" | "f";
 
@@ -36,22 +31,23 @@ export type HotelSearchResponse = {
   rawProperties: any[];
 };
 
-// export type FlightResult = {
-//   airline: string;
-//   departure: string;
-//   arrival: string;
-//   pricePerPerson: number;
-//   duration: string;
-// };
-
-// ── Search Hotels ─────────────────────────────────────────────────────────────
+export type FlightResult = {
+  airline: string;
+  departure: string;
+  arrival: string;
+  pricePerPerson: number;
+  duration: string;
+  departureToken: string;  // needed for round trip second call
+  bookingToken?: string;   // available after second call
+  bookingLink?: string;    // final booking URL
+};
 
 export async function searchTripadvisorPlaces(
   query: string,
   ssrc: TripadvisorSearchType = "a",
   limit = 5
 ): Promise<TripadvisorPlace[]> {
-  if (!process.env.SERPAPI_API_KEY) {
+  if (!env.SERPAPI_API_KEY) {
     throw new Error("SERPAPI_API_KEY is missing");
   }
 
@@ -60,7 +56,7 @@ export async function searchTripadvisorPlaces(
     q: query,
     ssrc,
     limit,
-    api_key: process.env.SERPAPI_API_KEY,
+    api_key: env.SERPAPI_API_KEY,
   });
 
   return (results.places ?? []).slice(0, limit);
@@ -73,7 +69,7 @@ export async function searchHotels(
   adults = 1,
   limit = 5,
 ): Promise<HotelSearchResponse> {
-  if (!process.env.SERPAPI_API_KEY) {
+  if (!env.SERPAPI_API_KEY) {
     throw new Error("SERPAPI_API_KEY is missing");
   }
 
@@ -85,7 +81,7 @@ export async function searchHotels(
     adults,
     currency: "USD",
     no_cache: true,
-    api_key: process.env.SERPAPI_API_KEY,
+    api_key: env.SERPAPI_API_KEY,
   };
 
   const response = await getJson(params);
@@ -113,25 +109,13 @@ export async function searchHotels(
   return { results, rawProperties };
 }
 
-export type FlightResult = {
-  airline: string;
-  departure: string;
-  arrival: string;
-  pricePerPerson: number;
-  duration: string;
-  departureToken: string;  // needed for round trip second call
-  bookingToken?: string;   // available after second call
-  bookingLink?: string;    // final booking URL
-};
-
 const BASE_PARAMS = {
   engine: "google_flights",
   currency: "USD",
   hl: "en",
-  api_key: process.env.SERPAPI_API_KEY,
+  api_key: env.SERPAPI_API_KEY,
 };
 
-// ── Call 1: Search outbound flights ──────────────────────────────────────────
 export async function searchDepartureFlights(
   origin: string,
   destination: string,
@@ -170,7 +154,6 @@ export async function searchDepartureFlights(
   });
 }
 
-// ── Call 2: Select a departure flight → get return flights + booking_token ───
 export async function searchReturnFlights(
   origin: string,
   destination: string,
@@ -188,7 +171,7 @@ export async function searchReturnFlights(
     return_date: returnDate,
     adults,
     type: "1",
-    departure_token: departureToken, // ← key param
+    departure_token: departureToken,
   };
 
   const results = await getJson(params);
@@ -208,12 +191,11 @@ export async function searchReturnFlights(
       pricePerPerson: f.price ?? 0,
       duration: f.total_duration ? `${Math.floor(f.total_duration / 60)}h ${f.total_duration % 60}m` : "N/A",
       departureToken: f.departure_token ?? "",
-      bookingToken: f.booking_token ?? "", // ← now available
+      bookingToken: f.booking_token ?? "",
     };
   });
 }
 
-// ── Call 3: Get booking URL from booking_token ───────────────────────────────
 export async function getFlightBookingLink(
   origin: string,
   destination: string | null,
@@ -230,7 +212,7 @@ export async function getFlightBookingLink(
     return_date: returnDate,
     adults,
     type: "1",
-    booking_token: bookingToken, // ← final call
+    booking_token: bookingToken,
   };
 
   const results = await getJson(params);

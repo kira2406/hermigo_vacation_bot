@@ -1,6 +1,6 @@
+// src/integrations/serpapi/maps.ts
 import { getJson } from "serpapi";
-
-const SERPAPI_API_KEY = process.env.SERPAPI_API_KEY;
+import { env } from "../../config/env.js";
 
 export interface PlaceResult {
   name: string;
@@ -11,27 +11,17 @@ export interface PlaceResult {
   location: { lat: number; lng: number };
 }
 
-// Search for places in a city using SerpAPI Google Maps
-export async function searchPlacesInCity(
-  city: string,
-  query: string = "tourist attractions",
-  limit: number = 10
-): Promise<PlaceResult[]> {
-  if (!SERPAPI_API_KEY) throw new Error("SERPAPI_API_KEY not configured");
-
-  console.log(`[Google Maps] Searching Google Maps via SerpAPI: "${query} in ${city}"`);
+export async function searchPlacesInCity(city: string, query: string = "tourist attractions", limit: number = 10): Promise<PlaceResult[]> {
+  console.log(`[SerpAPI - Maps] Searching: "${query} in ${city}"`);
 
   const data = await getJson({
     engine: "google_maps",
     q: `${query} in ${city}`,
     type: "search",
-    api_key: SERPAPI_API_KEY,
+    api_key: env.SERPAPI_API_KEY,
   });
 
   const results = data.local_results ?? [];
-
-  console.log(`[Google Maps] SerpAPI returned ${results.length} places`);
-
   return results.slice(0, limit).map((p: any) => ({
     name: p.title,
     address: p.address ?? "",

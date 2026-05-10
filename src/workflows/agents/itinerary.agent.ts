@@ -1,8 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import {
-  searchPlacesInCity,
-  groupNearbyPlaces,
-} from "./tools/google-maps.tool.js";
+
 import {
   updateTravelDates,
   updateItinerary,
@@ -11,10 +8,11 @@ import {
   storeReaction,
 } from "../../services/conversation.service.js";
 import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
-import { itineraryTools, DATA_RETRIEVAL_TOOLS } from "./tools/index.js";
+import { itineraryTools, DATA_RETRIEVAL_TOOLS } from "../tools/index.js";
 import { cleanResponse } from "../../util/helper.js";
+import { anthropic } from "../../services/llm.service.js";
+import { groupNearbyPlaces, searchPlacesInCity } from "../../integrations/serp/maps.js";
 
-const anthropic = new Anthropic();
 const MAX_TOOL_LOOPS = 5;
 const DRY_RUN = process.env.DRY_RUN === "true";
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));

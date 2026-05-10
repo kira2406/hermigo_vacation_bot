@@ -1,8 +1,7 @@
-import { getChannel, QUEUES } from "../services/rabbitmq.service.js";
-import { groupOrchestrator } from "../orchestrator/group_orchestrator/index.js";
-import { soloOrchestrator } from "../orchestrator/solo.orchestrator.js";
+import { getChannel, QUEUES } from "../config/rabbitmq.js";
+import { groupOrchestrator } from "../workflows/index.js";
 import { storeParticipantMessage } from "../services/conversation.service.js";
-import type { LinqWebhookPayload } from "../controllers/webhook.controller.js";
+import type { LinqWebhookPayload } from "../api/controllers/webhook.controller.js";
 
 export async function startWebhookWorker(): Promise<void> {
   const channel = getChannel();
@@ -33,24 +32,6 @@ export async function startWebhookWorker(): Promise<void> {
 
       console.log(`[Webhook worker] Processing event: ${messageId}`);
 
-      // if (isGroup) {
-      //   await storeParticipantMessage({
-      //     chatId,
-      //     isGroup,
-      //     sender,
-      //     content: message,
-      //     rawPayload: payload,
-      //   });
-
-      //   await groupOrchestrator({
-      //     chatId,
-      //     messageId,
-      //     text: message,
-      //     sender,
-      //     eventType: payload.event_type,
-      //   });
-      // } else {
-
         await storeParticipantMessage({
           chatId,
           isGroup,
@@ -67,9 +48,8 @@ export async function startWebhookWorker(): Promise<void> {
           sender,
           eventType: payload.event_type,
         });
-      // }
 
-      channel.ack(msg); // ✅ remove from queue on success
+      channel.ack(msg); // ✅ ack to remove from queue after successful processing
 
     } catch (error) {
 

@@ -1,10 +1,10 @@
 import type { Application, Request, Response } from "express";
 import express from "express";
-import webhookRoutes from "./routes/webhook.route.js";
+import webhookRoutes from "./api/routes/webhook.route.js";
 import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import { Client } from "langsmith";
-import { connectRabbitMQ } from "./services/rabbitmq.service.js";
+import { connectRabbitMQ } from "./config/rabbitmq.js";
 import { startWebhookWorker } from "./workers/webhook.worker.js";
 
 dotenv.config();

@@ -1,5 +1,5 @@
-import { getChannel, QUEUES } from "./rabbitmq.service.js";
-import type { LinqWebhookPayload } from "../controllers/webhook.controller.js";
+import { getChannel, QUEUES } from "../config/rabbitmq.js";
+import type { LinqWebhookPayload } from "../api/controllers/webhook.controller.js";
 
 export function publishWebhookEvent(payload: LinqWebhookPayload): void {
   const channel = getChannel();

@@ -1,16 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { searchTripadvisorPlaces } from "./tools/serp.tool.js";
+import { searchTripadvisorPlaces } from "../../integrations/serp/travel.js";
 import {
   updateVacationState,
   updateDestination,
   storeBotMessage,
   storeReaction,
 } from "../../services/conversation.service.js";
-import { DATA_RETRIEVAL_TOOLS, destinationTools } from "./tools/index.js";
 import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
 import { cleanResponse } from "../../util/helper.js";
+import { anthropic } from "../../services/llm.service.js";
+import { DATA_RETRIEVAL_TOOLS, destinationTools } from "../tools/index.js";
 
-const anthropic = new Anthropic();
 const MAX_TOOL_LOOPS = 5;
 const DRY_RUN = process.env.DRY_RUN === "true";
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));

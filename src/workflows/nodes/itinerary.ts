@@ -1,5 +1,5 @@
-import { itineraryAgent } from "../../agents/itinerary.agent.js";
-import { getOrCreateConversation } from "../../../services/conversation.service.js";
+import { itineraryAgent } from "../agents/itinerary.agent.js";
+import { getOrCreateConversation } from "../../services/conversation.service.js";
 import type { VacationGraphState } from "../state.js";
 
 export async function itineraryNode(
@@ -23,7 +23,8 @@ export async function itineraryNode(
       formattedHistory,
       state.participantCount,
       destination,
-      currentItinerary
+      currentItinerary,
+      state.isGroup
     );
 
   } catch (error) {

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { publishWebhookEvent } from "../services/publisher.service.js";
+import { publishWebhookEvent } from "../../services/publisher.service.js";
 
 // ✅ Define payload shape (minimal version for now)
 export interface LinqWebhookPayload {

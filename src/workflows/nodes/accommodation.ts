@@ -1,5 +1,5 @@
+import { accommodationAgent } from "../agents/accommodation.agent.js";
 import type { VacationGraphState } from "../state.js";
-import { accommodationAgent } from "../../agents/accommodation.agent.js";
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 const DRY_RUN = process.env.DRY_RUN === "true";
@@ -16,6 +16,7 @@ export async function accommodationNode(
     startDate,
     endDate,
     currentAccommodation,
+    isGroup
   } = state;
 
   if (!destination) {
@@ -38,7 +39,8 @@ export async function accommodationNode(
     destination,
     startDate ? new Date(startDate).toISOString().split("T")[0] : undefined,
     endDate ? new Date(endDate).toISOString().split("T")[0] : undefined,
-    currentAccommodation ?? null
+    currentAccommodation ?? null,
+    isGroup
   );
 
   return {};

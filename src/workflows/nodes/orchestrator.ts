@@ -1,9 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { orchestratorTools, DATA_RETRIEVAL_TOOLS } from "../../agents/tools/index.js";
 import type { VacationGraphState } from "../state.js";
 import type { Decision } from "../state.js";
-import { sendMessage, sendReaction, type Reaction } from "../../../linq/client.js";
-import { storeBotMessage, storeReaction } from "../../../services/conversation.service.js";
+import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
+import { storeBotMessage, storeReaction } from "../../services/conversation.service.js";
+import { anthropic } from "../../services/llm.service.js";
+import { DATA_RETRIEVAL_TOOLS, orchestratorTools } from "../tools/index.js";
 
 const MAX_TOOL_LOOPS = 3;
 const DRY_RUN = process.env.DRY_RUN === "true";
@@ -12,8 +13,6 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 export async function orchestratorNode(
   state: VacationGraphState
 ): Promise<Partial<VacationGraphState>> {
-
-  const anthropic = new Anthropic();
 
   const formattedHistory = state.history
     .map((msg) => `[${msg.timestamp || "unknown"}] ${msg.sender}: ${msg.content}`)

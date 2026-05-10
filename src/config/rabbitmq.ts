@@ -1,18 +1,20 @@
 import amqplib, { type ChannelModel, type Channel } from "amqplib";
+import { env } from "./env.js";
 
 export const QUEUES = {
   WEBHOOK_EVENTS: "webhook.events",
+  LINQ_EVENTS: "linq.events"
 } as const;
 
 let connection: ChannelModel;
 let channel: Channel;
 
 export async function connectRabbitMQ(): Promise<void> {
-  connection = await amqplib.connect(process.env.RABBITMQ_URL || "amqp://admin:password@localhost:5672");
+  connection = await amqplib.connect(env.RABBITMQ_URL);
   channel = await connection.createChannel();
 
-  // Durable: survives RabbitMQ restarts
   await channel.assertQueue(QUEUES.WEBHOOK_EVENTS, { durable: true });
+  await channel.assertQueue(QUEUES.LINQ_EVENTS, { durable: true });
 
   console.log("[RabbitMQ] connected");
 }

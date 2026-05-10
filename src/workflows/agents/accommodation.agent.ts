@@ -4,7 +4,7 @@ import {
   searchReturnFlights,
   getFlightBookingLink,
   searchHotels,
-} from "./tools/serp.tool.js";
+} from "../../integrations/serp/travel.js";
 import {
   confirmFlights,
   confirmHotel,
@@ -18,12 +18,12 @@ import {
   saveDepartureFlightOptions,
   getDepartureFlightOption,
 } from "../../services/conversation.service.js";
-import { accommodationTools, DATA_RETRIEVAL_TOOLS } from "./tools/index.js";
+import { accommodationTools, DATA_RETRIEVAL_TOOLS } from "../tools/index.js";
 import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
 import { getHotelImages, saveHotelsToCache, getHotelBookingLink } from "../../services/hotels.service.js";
 import { cleanResponse, getFlightDateConstraints } from "../../util/helper.js";
+import { anthropic } from "../../services/llm.service.js";
 
-const anthropic = new Anthropic();
 const MAX_TOOL_LOOPS = 5;
 const DRY_RUN = process.env.DRY_RUN === "true";
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));

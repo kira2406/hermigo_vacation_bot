@@ -1,5 +1,5 @@
-import { resolveContacts } from "../../../services/contact.service.js";
-import { createGroupChat } from "../../../linq/index.js";
+import { resolveContacts } from "../../services/contact.service.js";
+import { createGroupChat } from "../../linq/index.js";
 import type { VacationGraphState } from "../state.js";
 
 export async function createGroupNode(
