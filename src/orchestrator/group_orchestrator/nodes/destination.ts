@@ -19,7 +19,8 @@ export async function destinationNode(
       state.messageId,
       formattedHistory,
       formattedRecentMessages,
-      state.participantCount
+      state.participantCount,
+      state.isGroup
     );
 
   } catch (error) {

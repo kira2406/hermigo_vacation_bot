@@ -12,36 +12,49 @@ import {
 } from "../../services/conversation.service.js";
 import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
 import { itineraryTools, DATA_RETRIEVAL_TOOLS } from "./tools/index.js";
+import { cleanResponse } from "../../util/helper.js";
 
 const anthropic = new Anthropic();
 const MAX_TOOL_LOOPS = 5;
 const DRY_RUN = process.env.DRY_RUN === "true";
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-const SYSTEM_MESSAGE = `
-You are an itinerary specialist for a group vacation planner accessible via text message in a group chat.
+
+
+export async function itineraryAgent(
+  chatId: string,
+  messageId: string | undefined,
+  history: string,
+  participantCount: number,
+  destination: string,
+  currentItinerary: any[],
+  isGroup: boolean
+): Promise<void> {
+
+  const SYSTEM_MESSAGE = `
+You are an itinerary specialist for a vacation planner accessible via text message${isGroup ? " in a group chat" : ""}.
 
 ## What You Do
-- Help groups plan a day-by-day itinerary for their trip
+- Help ${isGroup ? "groups" : "someone"} plan a day-by-day itinerary for their trip
 - Search Google Maps for attractions grouped by proximity
-- Track travel dates and get group confirmation on the itinerary
-- Advance to accommodation planning once the full group confirms
+- Track travel dates and get ${isGroup ? "group" : ""} confirmation on the itinerary
+- Advance to accommodation planning once ${isGroup ? "the full group confirms" : "the user confirms"}
 
 ## Tools
 - "search_places": Use to find tourist attractions, restaurants, and activities in the destination city
-- "send_message": Send a text to the group. Use "---" to split into separate messages.
-- "send_reaction": React to the latest message — use sparingly.
-- "save_dates": Call when the group agrees on travel dates. Pass startDate and endDate as ISO strings.
+- "send_message": Send a text${isGroup ? " to the group" : ""}. Use "---" to split into separate messages.
+${isGroup ? `- "send_reaction": React to the latest message — use sparingly.` : ""}
+- "save_dates": Call when ${isGroup ? "the group agrees" : "the user confirms"} on travel dates. Pass startDate and endDate as ISO strings.
 - "save_itinerary": Call after building or updating the itinerary. Pass the structured list of activities.
-- "confirm_itinerary": Call ONLY when ALL participants have explicitly confirmed the itinerary.
-  Count confirmations by sender handle — no duplicates. Do NOT call until every member has confirmed.
+- "confirm_itinerary": Call ONLY when ${isGroup ? `ALL ${participantCount} participants have explicitly confirmed` : "the user has explicitly confirmed"} the itinerary.
+  ${isGroup ? "Count confirmations by sender handle — no duplicates. Do NOT call until every member has confirmed." : ""}
 
 ## Workflow
-1. No dates yet → ask the group when they plan to travel
+1. No dates yet → ask ${isGroup ? "the group" : "the user"} when they plan to travel
 2. Dates mentioned → confirm them with save_dates
 3. Dates confirmed → search_places → send_message with day-by-day itinerary
-4. Group gives feedback → update itinerary (only on consensus or direct request)
-5. ALL members confirm → send_message acknowledging + confirm_itinerary
+4. ${isGroup ? "Group" : "User"} gives feedback → update itinerary ${isGroup ? "(only on consensus or direct request)" : ""}
+5. ${isGroup ? "ALL members confirm" : "User confirms"} → send_message acknowledging + confirm_itinerary
 
 ## Itinerary Format (in send_message)
 - Organize by day with the date as a heading
@@ -52,13 +65,18 @@ You are an itinerary specialist for a group vacation planner accessible via text
 - Keep nearby places on the same day
 
 ## Confirmation Rules
+${isGroup ? `
 - Count explicit agreements: "looks good", "I'm in", "let's do it", "sounds great", "+1"
-- ALL participants must confirm — not just a majority
+- ALL ${participantCount} participants must confirm — not just a majority
 - If not everyone has confirmed, tell the group how many confirmations are still needed
 - Only call confirm_itinerary when every single member has confirmed
+` : `
+- Confirm when the user says "looks good", "let's do it", "sounds great", or similar
+- Call confirm_itinerary immediately on explicit confirmation
+`}
 
 ## Response Style
-You are texting — write like a helpful friend.
+You are texting — write like a helpful friend. Keep the tone casual and concise.
 
 CRITICAL: Mirror how humans actually text:
 - Use "---" to split your response into separate messages sent individually
@@ -66,25 +84,19 @@ CRITICAL: Mirror how humans actually text:
 - ALWAYS split longer responses with ---
 
 Guidelines:
+You MUST always call a tool. Never respond with plain text.
 - NO markdown (no bullets, headers, bold, numbered lists)
 - Be concise and conversational
 - Skip apostrophes — "dont", "cant", "im", "thats"
 - No ratings, no links, no image references
-
+${isGroup ? `
 ## Reactions
 React sparingly — text is always preferred. Never write "[reacted with ...]" in your text.
 Standard: love, like, dislike, laugh, emphasize, question
 Custom: any emoji
+` : ""}
 `;
 
-export async function itineraryAgent(
-  chatId: string,
-  messageId: string | undefined,
-  history: string,
-  participantCount: number,
-  destination: string,
-  currentItinerary: any[]
-): Promise<void> {
   const hasItinerary = currentItinerary && currentItinerary.length > 0;
 
   const messages: Anthropic.Messages.MessageParam[] = [
@@ -93,9 +105,13 @@ export async function itineraryAgent(
       content: `
 ${SYSTEM_MESSAGE}
 
-The group has ${participantCount} people planning a trip to ${destination}.
+${isGroup
+  ? `The group has ${participantCount} people planning a trip to ${destination}.
+ALL ${participantCount} must confirm before calling confirm_itinerary.`
+  : `This is a solo trip to ${destination}.
+Confirm itinerary when the user explicitly agrees.`
+}
 ${hasItinerary ? `Current itinerary: ${JSON.stringify(currentItinerary)}` : "No itinerary planned yet."}
-ALL ${participantCount} must confirm before calling confirm_itinerary.
 
 Conversation history:
 ${history}
@@ -106,7 +122,8 @@ ${history}
   let response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
-    tools: itineraryTools,
+    tools: itineraryTools(isGroup),
+    tool_choice: { type: "any" },
     messages,
   });
 
@@ -157,22 +174,50 @@ ${history}
       // ── send_message ─────────────────────────────────────────────────────
 
       } else if (name === "send_message") {
-        const parts = (args.content as string)
-          .split("---")
-          .map((p: string) => cleanResponse(p.trim()))
-          .filter(Boolean);
+        // Handle messages array format
+  if (args.messages && Array.isArray(args.messages)) {
+    for (const msg of args.messages) {
+      const text = cleanResponse(msg.content?.trim() ?? "");
+      if (!text) continue;
 
-        for (const part of parts) {
-          if (DRY_RUN) {
-            console.log(`[DRY RUN] reply: "${part}"`);
-          } else {
-            await sendMessage(chatId, part);
-            await delay(1500);
-          }
-        }
+      const media = msg.thumbnail ? [{ url: msg.thumbnail }] : undefined;
 
-        await storeBotMessage({ chatId, content: args.content });
-        toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
+      if (DRY_RUN) {
+        console.log(`[DRY RUN] reply: "${text}"${msg.thumbnail ? ` [image: ${msg.thumbnail}]` : ""}`);
+      } else {
+        await sendMessage(chatId, text, undefined, undefined, media);
+        await delay(1500);
+      }
+    }
+
+    const fullContent = args.messages.map((m: any) => m.content).join("\n");
+    await storeBotMessage({ chatId, content: fullContent });
+
+  } else if (args.content) {
+    // Handle single content string
+    const parts = (args.content as string)
+      .split("---")
+      .map((p: string) => cleanResponse(p.trim()))
+      .filter(Boolean);
+
+    for (const part of parts) {
+      const media = args.thumbnail ? [{ url: args.thumbnail }] : undefined;
+
+      if (DRY_RUN) {
+        console.log(`[DRY RUN] reply: "${part}"${args.thumbnail ? ` [image: ${args.thumbnail}]` : ""}`);
+      } else {
+        await sendMessage(chatId, part, undefined, undefined, media);
+        await delay(1500);
+      }
+    }
+
+    await storeBotMessage({ chatId, content: args.content });
+
+  } else {
+    console.warn("[accommodation] send_message called with no content or messages — skipping");
+  }
+
+  toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
 
       // ── send_reaction ─────────────────────────────────────────────────────
 
@@ -187,8 +232,8 @@ ${history}
 
         await storeReaction({
           chatId,
-          isGroup: true,
-          sender: "VacationBot",
+          isGroup,
+          sender: "HermigoBot",
           reaction: args.emoji,
           actorType: "bot",
           rawPayload: {},
@@ -240,7 +285,7 @@ ${history}
         toolResults.push({
           type: "tool_result",
           tool_use_id: id,
-          content: "Itinerary confirmed. State advanced to accommodation.",
+          content: "Itinerary confirmed. State advanced to accommodation. Suggest next steps for booking hotels and flights.",
         });
 
       } else {
@@ -251,29 +296,22 @@ ${history}
 
     messages.push({ role: "user", content: toolResults });
 
-    // Only continue the loop if a data-fetching tool needs its result fed back
-    if (hasDataTools) {
-      response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
-        tools: itineraryTools,
-        messages,
-      });
-    } else {
+    const hasTerminalTool = toolUseBlocks.some(
+      (b) => b.name === "confirm_itinerary" || b.name === "ignore"
+    );
+
+    if (hasTerminalTool) {
       break;
     }
 
+    response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      tools: itineraryTools(isGroup),
+      tool_choice: { type: "any" },
+      messages,
+    });
+
     loopCount++;
   }
-}
-
-function cleanResponse(text: string): string {
-  return text
-    .replace(/\n\s*-\s*/g, " - ")
-    .replace(/(?<!\w)_([^_]+)_(?!\w)/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/(?<!\w)\*([^*]+)\*(?!\w)/g, "$1")
-    .replace(/  +/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
