@@ -2,7 +2,8 @@ import { Annotation } from "@langchain/langgraph";
 
 // Decision shape
 export interface Decision {
-  action: "ignore" | "delegate";
+  action: "ignore" | "delegate" | "create_group";
+  participants?: string[]; // for create_group
   reasoning: string;
   targetAgent?: "destination" | "itinerary" | "accommodation";
 }
@@ -13,6 +14,7 @@ export const VacationStateAnnotation = Annotation.Root({
   messageId: Annotation<string | undefined>(),
   text: Annotation<string>(),
   sender: Annotation<string>(),
+  isGroup: Annotation<boolean>({ reducer: (_, b) => b, default: () => true }),
   participantCount: Annotation<number>(),
   vacationState: Annotation<"destination" | "itinerary" | "accommodation" | "complete">(),
   history: Annotation<any[]>({

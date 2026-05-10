@@ -12,7 +12,9 @@ type ContactsMap = Record<string, string>;
 const contacts: ContactsMap = {
   Alex: process.env.CONTACT_NUM1 || "",
   Max: process.env.CONTACT_NUM2 || "",
-  Lisa: process.env.CONTACT_NUM3 || ""
+  Lisa: process.env.CONTACT_NUM3 || "",
+  Sara: process.env.CONTACT_NUM4 || "",
+
 };
 
 // ✅ Type-safe function

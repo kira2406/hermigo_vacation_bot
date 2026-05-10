@@ -2,26 +2,32 @@ import Anthropic from "@anthropic-ai/sdk";
 import { orchestratorTools, DATA_RETRIEVAL_TOOLS } from "../../agents/tools/index.js";
 import type { VacationGraphState } from "../state.js";
 import type { Decision } from "../state.js";
+import { sendMessage, sendReaction, type Reaction } from "../../../linq/client.js";
+import { storeBotMessage, storeReaction } from "../../../services/conversation.service.js";
 
-const anthropic = new Anthropic();
 const MAX_TOOL_LOOPS = 3;
+const DRY_RUN = process.env.DRY_RUN === "true";
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 export async function orchestratorNode(
   state: VacationGraphState
 ): Promise<Partial<VacationGraphState>> {
+
+  const anthropic = new Anthropic();
+
   const formattedHistory = state.history
     .map((msg) => `[${msg.timestamp || "unknown"}] ${msg.sender}: ${msg.content}`)
     .join("\n");
 
   const systemPrompt = `
-    You are the routing brain for "VacationBot", an assistant helping a group of ${state.participantCount} friends plan a vacation.
+    You are the routing brain for "HermigoBot", an assistant helping a group of ${state.participantCount} friends plan a vacation.
     Current Phase: ${state.vacationState}.
 
     TASK: Read the latest message and call the appropriate tool.
 
     DELEGATION RULES (HIGHEST PRIORITY — follow these before anything else):
     - If vacationState is "destination" → ALWAYS delegate to "destination", no exceptions
-    - If vacationState is "itinerary" → ALWAYS delegate to "itinerary", no exceptions  
+    - If vacationState is "itinerary" → delegate to "itinerary", UNLESS the user wants to change the destination (e.g. "actually let's go somewhere else", "change destination", "I changed my mind about the city") → then delegate to "destination"
     - If vacationState is "accommodation" → ALWAYS delegate to "accommodation", no exceptions
       This includes: hotel questions, flight questions, origin city mentions, budget discussions,
       booking confirmations, or ANY travel logistics. The accommodation agent handles ALL of it.
@@ -29,11 +35,16 @@ export async function orchestratorNode(
     ONLY use send_message for off-topic summaries or clarifications that don't require a specialist.
 
     TOOL RULES:
-    - "ignore": Truly off-topic, no vacation relevance. Wait for at least ${Math.ceil(state.participantCount / 2)} people to weigh in.
-    - "send_reaction": A simple reaction is enough for off-topic messages (agreement, excitement, laughter).
     - "send_message": ONLY for edge cases with zero specialist relevance. If in doubt — delegate instead.
         CRITICAL: Use "---" to split into separate messages. 1-2 sentences per message max.
     - "delegate": Default choice whenever the current phase is active. When in doubt, delegate.
+      ${!state.isGroup ? `
+    - "create_group": Use when the user mentions specific people they want to travel with.
+    - Never use "ignore" or "send_reaction" alone in a 1-1 chat.
+  ` : `
+    - "ignore": Truly off-topic, no vacation relevance. Wait for at least ${Math.ceil(state.participantCount / 2)} people to weigh in.
+    - "send_reaction": A simple reaction is enough for off-topic messages.
+  `}
 
     You MUST call exactly one tool. Do not respond with plain text.
 
@@ -58,8 +69,8 @@ export async function orchestratorNode(
       model: "claude-haiku-4-5",
       max_tokens: 1024,
       system: systemPrompt,
-      tools: orchestratorTools,
-      tool_choice: { type: "any" }, // always call a tool
+      tools: orchestratorTools(state.isGroup),
+      tool_choice: { type: "any" },
       messages,
     });
 
@@ -70,16 +81,14 @@ export async function orchestratorNode(
     if (toolUseBlocks.length === 0) break;
 
     const toolUse = toolUseBlocks[0];
-    lastToolName = toolUse && toolUse.name || null;
-    lastToolArgs = toolUse && toolUse.input as any || null;
+    lastToolName = toolUse?.name || null;
+    lastToolArgs = toolUse?.input as any || null;
 
-    // Orchestrator has no data retrieval tools — exit immediately
     const hasDataTools = toolUseBlocks.some((b) =>
       DATA_RETRIEVAL_TOOLS?.orchestrator?.has(b.name)
     );
     if (!hasDataTools) break;
 
-    // Future-proofing: if data tools are ever added, feed results back and loop
     messages.push({ role: "assistant", content: response.content });
     messages.push({
       role: "user",
@@ -102,15 +111,65 @@ export async function orchestratorNode(
 
   console.log(`[Orchestrator] decision: [${lastToolName}]`, lastToolArgs);
 
-  // ── Map tool call → Decision ──────────────────────────────────────────────
+  // ── Execute send_message ──────────────────────────────────────────────────
+
+  if (lastToolName === "send_message") {
+    const parts = (lastToolArgs.content as string)
+      .split("---")
+      .map((p: string) => p.trim())
+      .filter(Boolean);
+
+    for (const part of parts) {
+      if (DRY_RUN) {
+        console.log(`[DRY RUN] orchestrator reply: "${part}"`);
+      } else {
+        await sendMessage(state.chatId, part);
+        await delay(1500);
+      }
+    }
+
+    await storeBotMessage({ chatId: state.chatId, content: lastToolArgs.content });
+    return { decision: { action: "ignore", reasoning: "Orchestrator handled message directly" } };
+  }
+
+  // ── Execute send_reaction ─────────────────────────────────────────────────
+
+  if (lastToolName === "send_reaction") {
+    if (!state.messageId) {
+      console.warn("[Orchestrator] Cannot react: messageId is undefined");
+    } else if (DRY_RUN) {
+      console.log(`[DRY RUN] orchestrator react: "${lastToolArgs.emoji}"`);
+    } else {
+      await sendReaction(state.messageId, { type: lastToolArgs.emoji } as Reaction, "add");
+    }
+
+    await storeReaction({
+      chatId: state.chatId,
+      isGroup: state.isGroup,
+      sender: "HermigoBot",
+      reaction: lastToolArgs.emoji,
+      actorType: "bot",
+      rawPayload: {},
+    });
+
+    console.log(`[Orchestrator] reacted with: ${lastToolArgs.emoji}`);
+    return { decision: { action: "ignore", reasoning: "Orchestrator handled reaction directly" } };
+  }
+
+  // ── Map remaining tool calls → Decision ───────────────────────────────────
 
   const decision: Decision = (() => {
     switch (lastToolName) {
-      case "send_reaction":
-      case "send_message":
       case "ignore":
         return {
           action: "ignore",
+          reasoning: lastToolArgs.reasoning,
+        };
+
+      case "create_group":
+        return {
+          action: "create_group",
+          participants: lastToolArgs.participants,
           reasoning: lastToolArgs.reasoning,
         };
 
@@ -122,7 +181,7 @@ export async function orchestratorNode(
         };
 
       default:
-        console.warn(`[Orchestrator] Unknown orchestrator tool: ${lastToolName}`);
+        console.warn(`[Orchestrator] Unknown tool: ${lastToolName}`);
         return { action: "ignore", reasoning: "Unknown tool" };
     }
   })();

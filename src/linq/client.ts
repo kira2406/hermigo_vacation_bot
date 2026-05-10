@@ -183,6 +183,7 @@ export async function sendMessage(chatId: string, text: string, effect?: Message
       parts.push({ type: 'media', url: m.url });
     }
   }
+  
 
   const message: Record<string, unknown> = { parts };
 

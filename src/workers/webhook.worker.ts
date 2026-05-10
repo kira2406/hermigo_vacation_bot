@@ -33,7 +33,24 @@ export async function startWebhookWorker(): Promise<void> {
 
       console.log(`[Webhook worker] Processing event: ${messageId}`);
 
-      if (isGroup) {
+      // if (isGroup) {
+      //   await storeParticipantMessage({
+      //     chatId,
+      //     isGroup,
+      //     sender,
+      //     content: message,
+      //     rawPayload: payload,
+      //   });
+
+      //   await groupOrchestrator({
+      //     chatId,
+      //     messageId,
+      //     text: message,
+      //     sender,
+      //     eventType: payload.event_type,
+      //   });
+      // } else {
+
         await storeParticipantMessage({
           chatId,
           isGroup,
@@ -45,17 +62,18 @@ export async function startWebhookWorker(): Promise<void> {
         await groupOrchestrator({
           chatId,
           messageId,
+          isGroup,
           text: message,
           sender,
           eventType: payload.event_type,
         });
-      } else {
-        await soloOrchestrator({ text: message, sender, chatId, messageId });
-      }
+      // }
 
       channel.ack(msg); // ✅ remove from queue on success
 
     } catch (error) {
+
+  
       console.error(`[Webhook worker] failed for message ${messageId}:`, error);
       // nack + requeue: false = discard after failure (avoids infinite loops)
       channel.nack(msg, false, false);

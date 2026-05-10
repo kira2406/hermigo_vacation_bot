@@ -22,14 +22,48 @@ const conversationSchema = new mongoose.Schema({
   participants: [{ type: String }], // Array of sender handles
   accommodation: {
   flights: {
-    airline: { type: String, default: null },
-    departure: { type: String, default: null },
-    arrival: { type: String, default: null },
-    pricePerPerson: { type: Number, default: null },
-    bookingLink: { type: String, default: null },
-    confirmedBy: [{ type: String }],
-    confirmedAt: { type: Date, default: null },
+      // Outbound leg
+      airline: { type: String, default: null },
+      flightNumber: { type: String, default: null },
+      departure: { type: String, default: null },       // outbound departure time
+      arrival: { type: String, default: null },         // outbound arrival time
+      departureAirport: { type: String, default: null },
+      arrivalAirport: { type: String, default: null },
+
+      // Return leg
+      returnAirline: { type: String, default: null },
+      returnFlightNumber: { type: String, default: null },
+      returnDeparture: { type: String, default: null }, // return departure time
+      returnArrival: { type: String, default: null },   // return arrival time
+
+      pricePerPerson: { type: Number, default: null },
+      bookingLink: { type: String, default: null },
+
+      // Tokens — stored so we can resume mid-selection if needed
+      departureToken: { type: String, default: null },  // set after user picks outbound
+      bookingToken: { type: String, default: null },    // set after user picks return
+
+      confirmedBy: [{ type: String }],
+      confirmedAt: { type: Date, default: null },
   },
+  returnFlightOptions: [{
+    option: Number,
+    airline: String,
+    departure: String,
+    arrival: String,
+    duration: String,
+    pricePerPerson: Number,
+    bookingToken: String,
+  }],
+  departureFlightOptions: [{
+  option: Number,
+  airline: String,
+  departure: String,
+  arrival: String,
+  duration: String,
+  pricePerPerson: Number,
+  departureToken: String,
+}],
   hotel: {
     name: { type: String, default: null },
     pricePerNight: { type: Number, default: null },
@@ -48,13 +82,6 @@ const conversationSchema = new mongoose.Schema({
     startDate: { type: Date, default: null },
     endDate: { type: Date, default: null }
   },
-  
-  // 🏨 NEW: Hotel Options & Voting
-  hotels: [{
-    name: String,
-    pricePerNight: Number,
-    url: String
-  }],
 
   // 🗺️ NEW: Itinerary Tracking
   itinerary: [{

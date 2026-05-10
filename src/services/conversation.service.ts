@@ -80,7 +80,7 @@ export async function storeBotMessage({
   conversation.events.push({
     eventType: "message.sent",
     actorType: "bot",
-    sender: "VacationBot",
+    sender: "HermigoBot",
     content,
     rawPayload,
   });
@@ -141,7 +141,7 @@ export async function updateVacationState(
 
 export async function updateDestination(
   chatId: string,
-  destination: string
+  destination: string | null
 ): Promise<void> {
   try {
     await Conversation.findOneAndUpdate(
@@ -216,10 +216,7 @@ export async function updateAccommodation(
 export async function confirmFlights(
   chatId: string,
   flights: {
-    airline: string;
-    departure: string;
-    arrival: string;
-    pricePerPerson: number;
+    google_flights_url: string | null;
     confirmedBy: string[];
   }
 ): Promise<void> {
@@ -227,16 +224,84 @@ export async function confirmFlights(
     await Conversation.findOneAndUpdate(
       { chatId },
       {
-        "accommodation.flights": {
-          ...flights,
-          confirmedAt: new Date(),
+        $set: {
+          "accommodation.flights.bookingLink": flights.google_flights_url,
+          "accommodation.flights.confirmedBy": flights.confirmedBy,
+          "accommodation.flights.confirmedAt": new Date(),
         },
       },
       { new: true }
     );
-    console.log(`[MongoDB] Flights confirmed for chat: ${chatId} — ${flights.airline}`);
+    console.log(`[MongoDB] Flights confirmed`);
   } catch (error) {
     console.error(`[MongoDB] Failed to confirm flights for chatId ${chatId}:`, error);
+    throw error;
+  }
+}
+
+export async function saveDepartureSelection(
+  chatId: string,
+  flight: {
+    airline: string;
+    flightNumber?: string;
+    departure: string;
+    arrival: string;
+    departureAirport?: string;
+    arrivalAirport?: string;
+    pricePerPerson: number;
+    departureToken: string | undefined | null;
+  }
+): Promise<void> {
+  try {
+    await Conversation.findOneAndUpdate(
+      { chatId },
+      {
+        $set: {
+          "accommodation.flights.airline": flight.airline,
+          "accommodation.flights.flightNumber": flight.flightNumber ?? null,
+          "accommodation.flights.departure": flight.departure,
+          "accommodation.flights.arrival": flight.arrival,
+          "accommodation.flights.departureAirport": flight.departureAirport ?? null,
+          "accommodation.flights.arrivalAirport": flight.arrivalAirport ?? null,
+          "accommodation.flights.pricePerPerson": flight.pricePerPerson,
+          "accommodation.flights.departureToken": flight.departureToken,
+        },
+      },
+      { new: true }
+    );
+    console.log(`[MongoDB] Departure selection saved for chat: ${chatId}`);
+  } catch (error) {
+    console.error(`[MongoDB] Failed to save departure selection for chatId ${chatId}:`, error);
+    throw error;
+  }
+}
+
+export async function saveReturnSelection(
+  chatId: string,
+  flight: {
+    returnAirline?: string | null | undefined;
+    returnDeparture: string | null | undefined;
+    returnArrival: string | null | undefined;
+    bookingToken: string | null | undefined;
+    bookingLink: string | null;
+  }
+): Promise<void> {
+  try {
+    await Conversation.findOneAndUpdate(
+      { chatId },
+      {
+        $set: {
+          "accommodation.flights.returnAirline": flight.returnAirline ?? null,
+          "accommodation.flights.returnDeparture": flight.returnDeparture,
+          "accommodation.flights.returnArrival": flight.returnArrival,
+          "accommodation.flights.bookingToken": flight.bookingToken,
+        },
+      },
+      { new: true }
+    );
+    console.log(`[MongoDB] Return selection saved for chat: ${chatId}`);
+  } catch (error) {
+    console.error(`[MongoDB] Failed to save return selection for chatId ${chatId}:`, error);
     throw error;
   }
 }
@@ -246,6 +311,7 @@ export async function confirmHotel(
   hotel: {
     hotel: string;
     pricePerNight: number;
+    bookingLink: string | null;
     confirmedBy: string[];
   }
 ): Promise<void> {
@@ -257,6 +323,7 @@ export async function confirmHotel(
           name: hotel.hotel,
           pricePerNight: hotel.pricePerNight,
           confirmedBy: hotel.confirmedBy,
+          bookingLink: hotel.bookingLink,
           confirmedAt: new Date(),
         },
       },
@@ -297,4 +364,57 @@ export async function getConfirmedHotelLink(
     console.error(`[MongoDB] Failed to fetch hotel booking link for chatId ${chatId}:`, error);
     return null;
   }
+}
+
+export async function saveReturnFlightOptions(
+  chatId: string,
+  options: {
+    option: number;
+    airline: string;
+    departure: string;
+    arrival: string;
+    duration: string;
+    pricePerPerson: number;
+    bookingToken: string;
+  }[]
+): Promise<void> {
+  await Conversation.findOneAndUpdate(
+    { chatId },
+    { $set: { "accommodation.returnFlightOptions": options } },
+    { new: true }
+  );
+}
+
+export async function getReturnFlightOption(chatId: string, optionNumber: number) {
+  const conv = await Conversation.findOne({ chatId });
+  return conv?.accommodation?.returnFlightOptions?.find(
+    (o: any) => o.option === optionNumber
+  ) ?? null;
+}
+
+export async function saveDepartureFlightOptions(
+  chatId: string,
+  options: {
+    option: number;
+    airline: string;
+    departure: string;
+    arrival: string;
+    duration: string;
+    pricePerPerson: number;
+    departureToken: string;
+  }[]
+): Promise<void> {
+  await Conversation.findOneAndUpdate(
+    { chatId },
+    { $set: { "accommodation.departureFlightOptions": options } },
+    { new: true }
+  );
+  console.log(`[MongoDB] Saved ${options.length} departure flight options for chat: ${chatId}`);
+}
+
+export async function getDepartureFlightOption(chatId: string, optionNumber: number) {
+  const conv = await Conversation.findOne({ chatId });
+  return conv?.accommodation?.departureFlightOptions?.find(
+    (o: any) => o.option === optionNumber
+  ) ?? null;
 }
