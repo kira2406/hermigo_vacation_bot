@@ -11,6 +11,7 @@ import { accommodationNode } from "./nodes/accommodation.js";
 import { routeDecision } from "./router.js";
 import { createGroupNode } from "./nodes/createGroupNode.js";
 import { startTyping, stopTyping } from "../linq/client.js";
+import { env } from "../config/env.js";
 
 export interface GroupOrchestratorParams {
   chatId: string;
@@ -48,7 +49,7 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
 
     const app = workflow.compile();
 
-    await startTyping(chatId);
+    if(!env.DRY_RUN) await startTyping(chatId);
     await app.invoke({
       chatId,
       messageId,
@@ -72,6 +73,6 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
     throw error;
   }
   finally {
-    await stopTyping(chatId);
+    if(!env.DRY_RUN) await stopTyping(chatId);
   }
 }

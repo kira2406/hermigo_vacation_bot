@@ -6,11 +6,12 @@ import {
   storeBotMessage,
   storeReaction,
 } from "../../services/conversation.service.js";
-import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
-import { cleanResponse, delay } from "../../util/helper.js";
-import { anthropic } from "../../services/llm.service.js";
+import { sendReaction, type Reaction } from "../../linq/client.js";
+
 import { DATA_RETRIEVAL_TOOLS, destinationTools } from "../tools/index.js";
 import { env } from "../../config/env.js";
+import { anthropic } from "./shared/anthropic.client.js";
+import { handleSendMessage, handleSendReaction } from "./shared/shared_handlers.js";
 
 const MAX_TOOL_LOOPS = 5;
 
@@ -191,61 +192,13 @@ RULES:
       // ── send_message ────────────────────────────────────────────────────
 
       } else if (name === "send_message") {
-        if (args.messages && Array.isArray(args.messages)) {
-          for (const msg of args.messages) {
-            const text = cleanResponse(msg.content?.trim() ?? "");
-            if (!text) continue;
-
-            const media = msg.thumbnail ? [{ url: msg.thumbnail }] : undefined;
-
-            if (env.DRY_RUN) {
-              console.log(`[DRY RUN] reply: "${text}"${msg.thumbnail ? ` [image: ${msg.thumbnail}]` : ""}`);
-            } else {
-              await sendMessage(chatId, text, undefined, undefined, media);
-              await delay(1500);
-            }
-          }} else if (args.content) {
-          const parts = (args.content as string)
-            .split("---")
-            .map((p: string) => cleanResponse(p.trim()))
-            .filter(Boolean);
-
-          for (const part of parts) {
-            const media = args.thumbnail ? [{ url: args.thumbnail }] : undefined;
-
-            if (env.DRY_RUN) {
-              console.log(`[DRY RUN] reply: "${part}"${args.thumbnail ? ` [image: ${args.thumbnail}]` : ""}`);
-            } else {
-              await sendMessage(chatId, part, undefined, undefined, media);
-              await delay(1500);
-            }
-          }
-
-          await storeBotMessage({ chatId, content: args.content });
-        }
-
+        await handleSendMessage(chatId, args);
         toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
 
       // ── send_reaction ───────────────────────────────────────────────────
 
       } else if (name === "send_reaction") {
-        if (!messageId) {
-          console.warn("[destination] Cannot react: messageId is undefined");
-        } else if (env.DRY_RUN) {
-          console.log(`[DRY RUN] react: "${args.emoji}"`);
-        } else {
-          await sendReaction(messageId, { type: args.emoji } as Reaction, "add");
-        }
-
-        await storeReaction({
-          chatId,
-          isGroup: true,
-          sender: "HermigoBot",
-          reaction: args.emoji,
-          actorType: "bot",
-          rawPayload: {},
-        });
-        console.log(`[destination] reacted with: ${args.emoji}`);
+        await handleSendReaction(chatId, messageId, args.emoji, isGroup);
         toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
 
       // ── ignore ──────────────────────────────────────────────────────────

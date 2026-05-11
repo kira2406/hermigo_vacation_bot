@@ -20,6 +20,6 @@ const contacts: ContactsMap = {
 // ✅ Type-safe function
 export function resolveContacts(names: string[] = []): string[] {
   return names
-    .map((name) => contacts[name])
+    .map((name) => contacts[name.toLowerCase()])
     .filter((phone): phone is string => Boolean(phone));
 }

@@ -22,8 +22,9 @@ import { accommodationTools, DATA_RETRIEVAL_TOOLS } from "../tools/index.js";
 import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
 import { getHotelImages, saveHotelsToCache, getHotelBookingLink } from "../../services/hotels.service.js";
 import { cleanResponse, delay, getFlightDateConstraints } from "../../util/helper.js";
-import { anthropic } from "../../services/llm.service.js";
 import { env } from "../../config/env.js";
+import { anthropic } from "./shared/anthropic.client.js";
+import { handleSendMessage, handleSendReaction } from "./shared/shared_handlers.js";
 
 const MAX_TOOL_LOOPS = 5;
 
@@ -197,7 +198,7 @@ ${history}
 
   let response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 2048,
+    max_tokens: 1024,
     tools: accommodationTools(isGroup),
     tool_choice: { type: "any" },
     messages,
@@ -507,74 +508,15 @@ ${history}
         // ── send_message ──────────────────────────────────────────────────────
 
       } else if (name === "send_message") {
-        // Handle messages array format
-        if (args.messages && Array.isArray(args.messages)) {
-          for (const msg of args.messages) {
-            const text = cleanResponse(msg.content?.trim() ?? "");
-            if (!text) continue;
-
-            const media = msg.thumbnail ? [{ url: msg.thumbnail }] : undefined;
-
-            if (env.DRY_RUN) {
-              console.log(`[DRY RUN] reply: "${text}"${msg.thumbnail ? ` [image: ${msg.thumbnail}]` : ""}`);
-            } else {
-              await sendMessage(chatId, text, undefined, undefined, media);
-              await delay(1500);
-            }
-          }
-
-          const fullContent = args.messages.map((m: any) => m.content).join("\n");
-          await storeBotMessage({ chatId, content: fullContent });
-
-        } else if (args.content) {
-          // Handle single content string
-          const parts = (args.content as string)
-            .split("---")
-            .map((p: string) => cleanResponse(p.trim()))
-            .filter(Boolean);
-
-          for (const part of parts) {
-            const media = args.thumbnail ? [{ url: args.thumbnail }] : undefined;
-
-            if (env.DRY_RUN) {
-              console.log(`[DRY RUN] reply: "${part}"${args.thumbnail ? ` [image: ${args.thumbnail}]` : ""}`);
-            } else {
-              await sendMessage(chatId, part, undefined, undefined, media);
-              await delay(1500);
-            }
-          }
-
-          await storeBotMessage({ chatId, content: args.content });
-
-        } else {
-          console.warn("[accommodation] send_message called with no content or messages — skipping");
-        }
-
+        await handleSendMessage(chatId, args); // ✅ Using shared handler
         toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
+        break;
 
         // ── send_reaction ─────────────────────────────────────────────────────
 
       } else if (name === "send_reaction") {
-        if (!messageId) {
-          console.warn("[accommodation] Cannot react: messageId is undefined");
-          toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
-        } else {
-          if (env.DRY_RUN) {
-            console.log(`[DRY RUN] react: "${args.emoji}"`);
-          } else {
-            await sendReaction(messageId, { type: args.emoji } as Reaction, "add");
-          }
-          await storeReaction({
-            chatId,
-            isGroup,
-            sender: "HermigoBot",
-            reaction: args.emoji,
-            actorType: "bot",
-            rawPayload: {},
-          });
-          console.log(`[accommodation] reacted with: ${args.emoji}`);
-          toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
-        }
+        await handleSendReaction(chatId, messageId, args.emoji, isGroup);
+        toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
 
         // ── ignore ────────────────────────────────────────────────────────────
 
@@ -649,7 +591,7 @@ ${history}
 
     response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 2048,
+      max_tokens: 1024,
       tools: accommodationTools(isGroup),
       tool_choice: { type: "any" },
       messages,
