@@ -77,11 +77,7 @@ npm install
 ```Bash
 docker-compose up -d
 ```
-- Run database migrations (if applicable):
 
-```Bash
-npm run db:migrate
-```
 - Start the development server and worker:
 ```Bash
 npm run dev
