@@ -33,3 +33,20 @@ export function getFlightDateConstraints(startDate: string | undefined, endDate:
     tripEnd: tripEnd.toISOString().split("T")[0],
   };
 }
+
+
+export const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+// a reusable formatter for messages
+export function formatChatHistory(messages: { timestamp?: string; sender: string; content: string }[]): string {
+  if (!messages || messages.length === 0) return "";
+  return messages
+    .map((msg) => `[${msg.timestamp || "unknown"}] ${msg.sender}: ${msg.content}`)
+    .join("\n");
+}
+
+// date formatting for agents
+export function formatAgentDate(dateString?: string): string | undefined {
+  if (!dateString) return undefined;
+  return new Date(dateString).toISOString().split("T")[0];
+}

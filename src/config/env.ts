@@ -13,6 +13,7 @@ const envSchema = z.object({
   LINQ_API_BASE_URL: z.string().url(),
   LINQ_API_TOKEN: z.string(),
   LINQ_PHONE_NUMBER: z.string(),
+  DRY_RUN: z.string().transform((val)=>val==="true")
 });
 
 export const env = envSchema.parse(process.env);

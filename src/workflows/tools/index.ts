@@ -244,56 +244,6 @@ const searchHotelsTool: Anthropic.Tool = {
   },
 };
 
-// const searchFlightsTool: Anthropic.Tool = {
-//   name: "search_flights",
-//   description: "Search for flights using SerpAPI Google Flights.",
-//   input_schema: {
-//     type: "object",
-//     properties: {
-//       origin: {
-//         type: "string",
-//         description: "Origin airport code (e.g. JFK)",
-//       },
-//       destination: {
-//         type: "string",
-//         description: "Destination airport code (e.g. PVG)",
-//       },
-//       departDate: {
-//         type: "string",
-//         description: "Departure date (YYYY-MM-DD)",
-//       },
-//       returnDate: {
-//         type: "string",
-//         description: "Return date (YYYY-MM-DD)",
-//       },
-//       adults: { type: "number", default: 2 },
-//     },
-//     required: ["origin", "destination", "departDate", "returnDate"],
-//   },
-// };
-
-// const confirmFlightsTool: Anthropic.Tool =
-// {
-// name: "confirm_flights",
-// description:
-//   "Lock in the chosen flight once ALL participants have explicitly agreed on it.",
-// input_schema: {
-//   type: "object",
-//   properties: {
-//     airline: { type: "string", description: "The confirmed airline" },
-//     departure: { type: "string" },
-//     arrival: { type: "string" },
-//     pricePerPerson: { type: "number" },
-//     confirmedBy: {
-//       type: "array",
-//       items: { type: "string" },
-//       description: "Handles of every participant who confirmed",
-//     },
-//   },
-//   required: ["airline", "departure", "arrival", "pricePerPerson", "confirmedBy"],
-// },
-// };
-
 const confirmHotelTool: Anthropic.Tool =
 {
   name: "confirm_hotel",
@@ -417,7 +367,7 @@ export function orchestratorTools(isGroup: boolean): Anthropic.Tool[] {
   const base = [delegateTool, sendMessageTool, ignoreTool, sendReactionTool];
   
   if (isGroup) {
-    return [...base, ignoreTool, sendReactionTool];
+    return [...base];
   } else {
     return [...base, createGroupTool];
   }

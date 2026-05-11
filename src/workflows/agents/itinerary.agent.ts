@@ -9,15 +9,12 @@ import {
 } from "../../services/conversation.service.js";
 import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
 import { itineraryTools, DATA_RETRIEVAL_TOOLS } from "../tools/index.js";
-import { cleanResponse } from "../../util/helper.js";
+import { cleanResponse, delay } from "../../util/helper.js";
 import { anthropic } from "../../services/llm.service.js";
 import { groupNearbyPlaces, searchPlacesInCity } from "../../integrations/serp/maps.js";
+import { env } from "../../config/env.js";
 
 const MAX_TOOL_LOOPS = 5;
-const DRY_RUN = process.env.DRY_RUN === "true";
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
-
 
 export async function itineraryAgent(
   chatId: string,
@@ -180,7 +177,7 @@ ${history}
 
       const media = msg.thumbnail ? [{ url: msg.thumbnail }] : undefined;
 
-      if (DRY_RUN) {
+      if (env.DRY_RUN) {
         console.log(`[DRY RUN] reply: "${text}"${msg.thumbnail ? ` [image: ${msg.thumbnail}]` : ""}`);
       } else {
         await sendMessage(chatId, text, undefined, undefined, media);
@@ -201,7 +198,7 @@ ${history}
     for (const part of parts) {
       const media = args.thumbnail ? [{ url: args.thumbnail }] : undefined;
 
-      if (DRY_RUN) {
+      if (env.DRY_RUN) {
         console.log(`[DRY RUN] reply: "${part}"${args.thumbnail ? ` [image: ${args.thumbnail}]` : ""}`);
       } else {
         await sendMessage(chatId, part, undefined, undefined, media);
@@ -222,7 +219,7 @@ ${history}
       } else if (name === "send_reaction") {
         if (!messageId) {
           console.warn("[itinerary] Cannot react: messageId is undefined");
-        } else if (DRY_RUN) {
+        } else if (env.DRY_RUN) {
           console.log(`[DRY RUN] react: "${args.emoji}"`);
         } else {
           await sendReaction(messageId, { type: args.emoji } as Reaction, "add");

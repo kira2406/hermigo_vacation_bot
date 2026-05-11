@@ -5,18 +5,14 @@ import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
 import { storeBotMessage, storeReaction } from "../../services/conversation.service.js";
 import { anthropic } from "../../services/llm.service.js";
 import { DATA_RETRIEVAL_TOOLS, orchestratorTools } from "../tools/index.js";
+import { delay, formatChatHistory } from "../../util/helper.js";
+import { env } from "../../config/env.js";
 
 const MAX_TOOL_LOOPS = 3;
-const DRY_RUN = process.env.DRY_RUN === "true";
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 export async function orchestratorNode(
   state: VacationGraphState
 ): Promise<Partial<VacationGraphState>> {
-
-  const formattedHistory = state.history
-    .map((msg) => `[${msg.timestamp || "unknown"}] ${msg.sender}: ${msg.content}`)
-    .join("\n");
 
   const systemPrompt = `
     You are the routing brain for "HermigoBot", an assistant helping a group of ${state.participantCount} friends plan a vacation.
@@ -55,7 +51,7 @@ export async function orchestratorNode(
   const messages: Anthropic.MessageParam[] = [
     {
       role: "user",
-      content: `Conversation history:\n${formattedHistory}\n\nLatest message from ${state.sender}: ${state.text}`,
+      content: `Conversation history:\n${formatChatHistory(state.history)}\n\nLatest message from ${state.sender}: ${state.text}`,
     },
   ];
 
@@ -119,7 +115,7 @@ export async function orchestratorNode(
       .filter(Boolean);
 
     for (const part of parts) {
-      if (DRY_RUN) {
+      if (env.DRY_RUN) {
         console.log(`[DRY RUN] orchestrator reply: "${part}"`);
       } else {
         await sendMessage(state.chatId, part);
@@ -136,7 +132,7 @@ export async function orchestratorNode(
   if (lastToolName === "send_reaction") {
     if (!state.messageId) {
       console.warn("[Orchestrator] Cannot react: messageId is undefined");
-    } else if (DRY_RUN) {
+    } else if (env.DRY_RUN) {
       console.log(`[DRY RUN] orchestrator react: "${lastToolArgs.emoji}"`);
     } else {
       await sendReaction(state.messageId, { type: lastToolArgs.emoji } as Reaction, "add");

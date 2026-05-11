@@ -1,8 +1,6 @@
+import { formatChatHistory } from "../../util/helper.js";
 import { accommodationAgent } from "../agents/accommodation.agent.js";
 import type { VacationGraphState } from "../state.js";
-
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-const DRY_RUN = process.env.DRY_RUN === "true";
 
 export async function accommodationNode(
   state: VacationGraphState
@@ -32,9 +30,7 @@ export async function accommodationNode(
   await accommodationAgent(
     chatId,
     messageId,
-    history
-      .map((msg) => `[${msg.timestamp || "unknown"}] ${msg.sender}: ${msg.content}`)
-      .join("\n"),
+    formatChatHistory(history),
     participantCount,
     destination,
     startDate ? new Date(startDate).toISOString().split("T")[0] : undefined,

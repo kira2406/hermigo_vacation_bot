@@ -48,7 +48,7 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
 
     const app = workflow.compile();
 
-    await startTyping(chatId); // start typing indicator
+    await startTyping(chatId);
     await app.invoke({
       chatId,
       messageId,
@@ -72,6 +72,6 @@ export async function groupOrchestrator({ text, sender, chatId, eventType, messa
     throw error;
   }
   finally {
-    await stopTyping(chatId); // always stop, even on error
+    await stopTyping(chatId);
   }
 }

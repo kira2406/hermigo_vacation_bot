@@ -21,12 +21,11 @@ import {
 import { accommodationTools, DATA_RETRIEVAL_TOOLS } from "../tools/index.js";
 import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
 import { getHotelImages, saveHotelsToCache, getHotelBookingLink } from "../../services/hotels.service.js";
-import { cleanResponse, getFlightDateConstraints } from "../../util/helper.js";
+import { cleanResponse, delay, getFlightDateConstraints } from "../../util/helper.js";
 import { anthropic } from "../../services/llm.service.js";
+import { env } from "../../config/env.js";
 
 const MAX_TOOL_LOOPS = 5;
-const DRY_RUN = process.env.DRY_RUN === "true";
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 export async function accommodationAgent(
   chatId: string,
@@ -516,7 +515,7 @@ ${history}
 
             const media = msg.thumbnail ? [{ url: msg.thumbnail }] : undefined;
 
-            if (DRY_RUN) {
+            if (env.DRY_RUN) {
               console.log(`[DRY RUN] reply: "${text}"${msg.thumbnail ? ` [image: ${msg.thumbnail}]` : ""}`);
             } else {
               await sendMessage(chatId, text, undefined, undefined, media);
@@ -537,7 +536,7 @@ ${history}
           for (const part of parts) {
             const media = args.thumbnail ? [{ url: args.thumbnail }] : undefined;
 
-            if (DRY_RUN) {
+            if (env.DRY_RUN) {
               console.log(`[DRY RUN] reply: "${part}"${args.thumbnail ? ` [image: ${args.thumbnail}]` : ""}`);
             } else {
               await sendMessage(chatId, part, undefined, undefined, media);
@@ -560,7 +559,7 @@ ${history}
           console.warn("[accommodation] Cannot react: messageId is undefined");
           toolResults.push({ type: "tool_result", tool_use_id: id, content: "ok" });
         } else {
-          if (DRY_RUN) {
+          if (env.DRY_RUN) {
             console.log(`[DRY RUN] react: "${args.emoji}"`);
           } else {
             await sendReaction(messageId, { type: args.emoji } as Reaction, "add");
@@ -622,7 +621,7 @@ ${history}
 
         for (const link of links) {
           const msg = `${link.label}: ${link.url}`;
-          if (DRY_RUN) {
+          if (env.DRY_RUN) {
             console.log(`[DRY RUN] booking link: "${msg}"`);
           } else {
             await sendMessage(chatId, msg);

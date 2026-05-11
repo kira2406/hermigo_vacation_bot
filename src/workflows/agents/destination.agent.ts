@@ -7,13 +7,12 @@ import {
   storeReaction,
 } from "../../services/conversation.service.js";
 import { sendMessage, sendReaction, type Reaction } from "../../linq/client.js";
-import { cleanResponse } from "../../util/helper.js";
+import { cleanResponse, delay } from "../../util/helper.js";
 import { anthropic } from "../../services/llm.service.js";
 import { DATA_RETRIEVAL_TOOLS, destinationTools } from "../tools/index.js";
+import { env } from "../../config/env.js";
 
 const MAX_TOOL_LOOPS = 5;
-const DRY_RUN = process.env.DRY_RUN === "true";
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 export async function destinationAgent(
   chatId: string,
@@ -199,7 +198,7 @@ RULES:
 
             const media = msg.thumbnail ? [{ url: msg.thumbnail }] : undefined;
 
-            if (DRY_RUN) {
+            if (env.DRY_RUN) {
               console.log(`[DRY RUN] reply: "${text}"${msg.thumbnail ? ` [image: ${msg.thumbnail}]` : ""}`);
             } else {
               await sendMessage(chatId, text, undefined, undefined, media);
@@ -214,7 +213,7 @@ RULES:
           for (const part of parts) {
             const media = args.thumbnail ? [{ url: args.thumbnail }] : undefined;
 
-            if (DRY_RUN) {
+            if (env.DRY_RUN) {
               console.log(`[DRY RUN] reply: "${part}"${args.thumbnail ? ` [image: ${args.thumbnail}]` : ""}`);
             } else {
               await sendMessage(chatId, part, undefined, undefined, media);
@@ -232,7 +231,7 @@ RULES:
       } else if (name === "send_reaction") {
         if (!messageId) {
           console.warn("[destination] Cannot react: messageId is undefined");
-        } else if (DRY_RUN) {
+        } else if (env.DRY_RUN) {
           console.log(`[DRY RUN] react: "${args.emoji}"`);
         } else {
           await sendReaction(messageId, { type: args.emoji } as Reaction, "add");
@@ -302,8 +301,6 @@ RULES:
       tool_choice: { type: "any" },
       messages,
     });
-
-    console.log(`[destination] response after tool use #${loopCount + 1}:`, JSON.stringify(response,null,2));
 
     loopCount++;
   }
