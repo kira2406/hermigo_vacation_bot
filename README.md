@@ -106,7 +106,7 @@ src/
 ![architecture](assets/architecture.png)
 
 # 🎥 Demo
-(Link to your recorded Loom/video demo here)
+[(Link to a video demo of HermigoBot)](https://www.loom.com/share/2b92805f7ec34da2b7931818e441300d)
 
 # Sample Examples
 
