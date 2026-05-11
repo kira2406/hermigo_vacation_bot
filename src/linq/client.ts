@@ -1,11 +1,12 @@
 // Linq Blue V3 API Client
 // Ref: https://apidocs.linqapp.com/models
 import dotenv from "dotenv";
+import { env } from "../config/env.js";
 
 dotenv.config();
 
-const BASE_URL = process.env.LINQ_API_BASE_URL || 'https://api.linqapp.com/api/partner/v3';
-const API_TOKEN = process.env.LINQ_API_TOKEN;
+const BASE_URL = env.LINQ_API_BASE_URL || 'https://api.linqapp.com/api/partner/v3';
+const API_TOKEN = env.LINQ_API_TOKEN;
 
 // Truncate error messages (especially HTML error pages)
 function truncateError(text: string, maxLen = 100): string {
@@ -55,7 +56,7 @@ export async function createGroupChat(
     throw new Error("Participants list is empty");
   }
 
-  const phoneNumber = process.env.LINQ_PHONE_NUMBER;
+  const phoneNumber = env.LINQ_PHONE_NUMBER;
   if (!phoneNumber) {
     throw new Error("LINQ_PHONE_NUMBER not configured");
   }

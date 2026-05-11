@@ -1,11 +1,12 @@
 import type { Application, Request, Response } from "express";
 import express from "express";
-import webhookRoutes from "./routes/webhook.route.js";
+import webhookRoutes from "./api/routes/webhook.route.js";
 import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import { Client } from "langsmith";
-import { connectRabbitMQ } from "./services/rabbitmq.service.js";
+import { connectRabbitMQ } from "./config/rabbitmq.js";
 import { startWebhookWorker } from "./workers/webhook.worker.js";
+import { env } from "./config/env.js";
 
 dotenv.config();
 
@@ -23,7 +24,7 @@ app.get("/", (req: Request, res: Response) => {
 
 app.use("/webhook", webhookRoutes);
 
-const PORT: number = Number(process.env.PORT) || 3000;
+const PORT: number = Number(env.PORT) || 3000;
 
 async function bootstrap(): Promise<void> {
   try {

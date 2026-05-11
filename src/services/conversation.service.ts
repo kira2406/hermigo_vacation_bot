@@ -242,7 +242,7 @@ export async function confirmFlights(
 export async function saveDepartureSelection(
   chatId: string,
   flight: {
-    airline: string;
+    airline: string | undefined;
     flightNumber?: string;
     departure: string;
     arrival: string;
