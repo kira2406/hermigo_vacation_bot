@@ -20,7 +20,7 @@ Built as a submission for the Linq Technical Challenge.
 * **Language:** TypeScript / Node.js
 * **LLM Provider:** Anthropic (Claude 3.5 Sonnet & Haiku)
 * **Message Broker:** RabbitMQ
-* **Database:** PostgreSQL (for conversation state and caching)
+* **Database:** MongoDB (for conversation state and caching)
 * **External APIs:** Linq API, Serp API (Flights/Hotels/TripAdvisor)
 
 ## 🏗️ Architecture
@@ -35,7 +35,7 @@ Built as a submission for the Linq Technical Challenge.
 ### Prerequisites
 
 * Node.js (v18+)
-* PostgreSQL
+* MongoDB
 * RabbitMQ (can be run via Docker)
 * API Keys: Linq Sandbox, Anthropic, and your chosen SERP/Travel APIs.
 
@@ -48,7 +48,7 @@ Create a `.env` file in the root directory:
 PORT=3000
 
 # Infrastructure
-DATABASE_URL=postgresql://user:password@localhost:5432/hermes_bot
+MONGO_URL=mongodb://localhost:27017/your_database_name
 RABBITMQ_URL=amqp://localhost
 
 # LINQ API BASE URL
